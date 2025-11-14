@@ -1,0 +1,7 @@
+{
+  "name": "PMOC Management System",
+  "description": "A comprehensive web application for managing Maintenance, Operation, and Control Plans (PMOC) for HVAC systems. It allows tracking contracts, equipment, maintenance schedules, and generating legal compliance reports.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

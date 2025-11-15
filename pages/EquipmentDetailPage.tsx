@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ChevronLeft, Wrench, Building, Hash, Tag, LoaderCircle, Info } from 'lucide-react';
 import { Equipment, ServiceOrder, ServiceOrderStatus } from '../types';
-import { mockEquipments, mockCustomers, getFullServiceOrders } from '../data/mockData';
+import { supabase } from '../lib/supabaseClient';
 
 const statusText: { [key in ServiceOrderStatus]: string } = {
     [ServiceOrderStatus.AguardandoAgendamento]: 'Aguardando Agendamento',
@@ -29,25 +29,39 @@ const EquipmentDetailPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!id) return;
-        setLoading(true);
-        setTimeout(() => {
-            const equipmentId = parseInt(id, 10);
-            const foundEquipment = mockEquipments.find(e => e.id === equipmentId);
-            if (foundEquipment) {
-                const fullEquipment = {
-                    ...foundEquipment,
-                    customers: mockCustomers.find(c => c.id === foundEquipment.customer_id)
-                };
-                setEquipment(fullEquipment);
+        const fetchEquipmentData = async () => {
+            if (!id) return;
+            setLoading(true);
 
-                const history = getFullServiceOrders()
-                    .filter(so => so.equipment_id === equipmentId)
-                    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-                setServiceHistory(history as ServiceOrder[]);
+            const equipmentId = parseInt(id, 10);
+            
+            const { data: eqData, error: eqError } = await supabase
+                .from('equipments')
+                .select('*, customers (*)')
+                .eq('id', equipmentId)
+                .single();
+
+            if (eqError) {
+                console.error("Error fetching equipment", eqError);
+            } else {
+                setEquipment(eqData as Equipment);
             }
+
+            const { data: historyData, error: historyError } = await supabase
+                .from('service_orders')
+                .select('*')
+                .eq('equipment_id', equipmentId)
+                .order('created_at', { ascending: false });
+            
+            if (historyError) {
+                console.error("Error fetching service history", historyError);
+            } else {
+                setServiceHistory(historyData as ServiceOrder[]);
+            }
+
             setLoading(false);
-        }, 300);
+        };
+        fetchEquipmentData();
     }, [id]);
 
     if (loading) {

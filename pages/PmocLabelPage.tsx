@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Printer, ChevronLeft, LoaderCircle, MapPin, HardHat, Calendar, Wrench, Settings, FileText } from 'lucide-react';
-import * as qrcode from 'qrcode.react';
+import QRCode from 'qrcode.react';
 import { ServiceOrder } from '../types';
-import { getFullServiceOrders } from '../data/mockData';
+import { supabase } from '../lib/supabaseClient';
 
 const PmocLabelPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -11,13 +11,24 @@ const PmocLabelPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!id) return;
-        setLoading(true);
-        setTimeout(() => {
-            const foundOrder = getFullServiceOrders().find(o => o.id === parseInt(id, 10));
-            setOrder(foundOrder as ServiceOrder || null);
+        const fetchOrder = async () => {
+            if (!id) return;
+            setLoading(true);
+            
+            const { data, error } = await supabase
+                .from('service_orders')
+                .select('*, customers (*), users (*), equipments (*)')
+                .eq('id', parseInt(id, 10))
+                .single();
+
+            if (error) {
+                console.error("Error fetching order for label", error);
+            } else {
+                setOrder(data as ServiceOrder);
+            }
             setLoading(false);
-        }, 300);
+        };
+        fetchOrder();
     }, [id]);
 
     const handlePrint = () => {
@@ -119,7 +130,7 @@ const PmocLabelPage: React.FC = () => {
                                 </div>
                             </div>
                             <div className="col-span-1 flex flex-col items-center justify-center p-4 bg-gray-100 rounded-lg">
-                                <qrcode.QRCodeSVG value={equipmentUrl} size={160} />
+                                <QRCode value={equipmentUrl} size={160} renderAs="svg" />
                                 <p className="text-center text-xs text-gray-600 mt-3 font-semibold">
                                     Aponte a câmera para acessar o histórico completo do equipamento.
                                 </p>

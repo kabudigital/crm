@@ -14,7 +14,6 @@ import TechnicianDashboardPage from './pages/TechnicianDashboardPage';
 import { User, UserRole } from './types';
 import AdminLayout from './components/AdminLayout';
 import TechnicianLayout from './components/TechnicianLayout';
-import { mockUsers } from './data/mockData';
 import CampaignsPage from './pages/CampaignsPage';
 import NewCampaignPage from './pages/NewCampaignPage';
 import QuotesPage from './pages/QuotesPage';
@@ -23,49 +22,77 @@ import FinishServiceOrderPage from './pages/FinishServiceOrderPage';
 import ContractsPage from './pages/ContractsPage';
 import ContractDetailPage from './pages/ContractDetailPage';
 import PmocLabelPage from './pages/PmocLabelPage';
+import EquipmentPmocHistoryPage from './pages/EquipmentPmocHistoryPage';
+import { supabase } from './lib/supabaseClient';
+import { Session } from '@supabase/supabase-js';
+import { LoaderCircle } from 'lucide-react';
 
 const App: React.FC = () => {
-  const [loggedInUser, setLoggedInUser] = useState<User | null>(() => {
-    const savedUser = sessionStorage.getItem('loggedInUser');
-    return savedUser ? JSON.parse(savedUser) : null;
-  });
+  const [session, setSession] = useState<Session | null>(null);
+  const [userProfile, setUserProfile] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // This effect ensures data consistency for newly registered users after a page reload.
-    if (loggedInUser) {
-      const userExistsInMockData = mockUsers.some(user => user.id === loggedInUser.id);
-      if (!userExistsInMockData) {
-        mockUsers.push(loggedInUser);
+    const getSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setSession(session);
+      if (session?.user) {
+        const { data: profile } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+        setUserProfile(profile);
       }
-    }
-  }, [loggedInUser]);
+      setLoading(false);
+    };
 
-  const handleLogin = (user: User) => {
-    sessionStorage.setItem('loggedInUser', JSON.stringify(user));
-    setLoggedInUser(user);
+    getSession();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session?.user) {
+        // Fetch profile on login/token refresh
+        supabase
+          .from('users')
+          .select('*')
+          .eq('id', session.user.id)
+          .single()
+          .then(({ data: profile }) => setUserProfile(profile));
+      } else {
+        setUserProfile(null);
+      }
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setUserProfile(null);
   };
 
-  const handleLogout = () => {
-    sessionStorage.removeItem('loggedInUser');
-    setLoggedInUser(null);
-  };
-  
-  const handleRegister = (user: User) => {
-     sessionStorage.setItem('loggedInUser', JSON.stringify(user));
-     setLoggedInUser(user);
-  };
-
-  if (!loggedInUser) {
-    return <AuthPage onLogin={handleLogin} onRegister={handleRegister} />;
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <LoaderCircle className="animate-spin h-16 w-16 text-brand-primary" />
+      </div>
+    );
   }
 
-  const isAdmin = loggedInUser.role === UserRole.Admin || loggedInUser.role === UserRole.Supervisor;
+  if (!session || !userProfile) {
+    return <AuthPage />;
+  }
+
+  const isAdmin = userProfile.role === UserRole.Admin || userProfile.role === UserRole.Supervisor;
 
   return (
     <HashRouter>
       <Routes>
         {isAdmin ? (
-          <Route element={<AdminLayout user={loggedInUser} onLogout={handleLogout} />}>
+          <Route element={<AdminLayout user={userProfile} onLogout={handleLogout} />}>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/service-orders" element={<ServiceOrdersPage />} />
             <Route path="/service-orders/new" element={<NewServiceOrderPage />} />
@@ -76,6 +103,7 @@ const App: React.FC = () => {
             <Route path="/customers/:id" element={<CustomerDetailPage />} />
             <Route path="/customers/new" element={<NewCustomerPage />} />
             <Route path="/equipment/:id" element={<EquipmentDetailPage />} />
+            <Route path="/equipment/:id/pmoc-history" element={<EquipmentPmocHistoryPage />} />
             <Route path="/technicians" element={<TechniciansPage />} />
             <Route path="/technicians/new" element={<NewTechnicianPage />} />
             <Route path="/campaigns" element={<CampaignsPage />} />
@@ -85,11 +113,12 @@ const App: React.FC = () => {
             <Route path="/contracts/:id" element={<ContractDetailPage />} />
           </Route>
         ) : (
-          <Route element={<TechnicianLayout technician={loggedInUser} onLogout={handleLogout} />}>
+          <Route element={<TechnicianLayout technician={userProfile} onLogout={handleLogout} />}>
             <Route path="/" element={<TechnicianDashboardPage />} />
             <Route path="/service-orders/:id" element={<ServiceOrderDetailPage />} />
             <Route path="/service-orders/:id/finish" element={<FinishServiceOrderPage />} />
             <Route path="/service-orders/:id/label" element={<PmocLabelPage />} />
+            <Route path="/equipment/:id/pmoc-history" element={<EquipmentPmocHistoryPage />} />
           </Route>
         )}
       </Routes>

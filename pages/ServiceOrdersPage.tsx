@@ -69,7 +69,12 @@ const ServiceOrdersPage: React.FC = () => {
         }
         
         if (searchTerm) {
-             query = query.or(`reported_problem.ilike.%${searchTerm}%,customers.name.ilike.%${searchTerm}%`);
+            const isNumeric = !isNaN(parseFloat(searchTerm)) && isFinite(searchTerm as any);
+            if (isNumeric) {
+                query = query.eq('id', parseInt(searchTerm, 10));
+            } else {
+                query = query.ilike('reported_problem', `%${searchTerm}%`);
+            }
         }
         
         const { data, error } = await query;
@@ -97,7 +102,7 @@ const ServiceOrdersPage: React.FC = () => {
                     </span>
                     <input
                         type="text"
-                        placeholder="Buscar por OS, cliente ou problema..."
+                        placeholder="Buscar por OS ou problema..."
                         className="w-full py-2 pl-10 pr-4 border rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-primary"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}

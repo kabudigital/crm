@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, LoaderCircle, Users, User, Calendar, CheckCircle, AlertTriangle, Clock } from 'lucide-react';
 import { Campaign, CampaignStatus, Customer } from '../types';
-import { mockCampaigns, mockCustomers } from '../data/mockData';
+import { supabase } from '../lib/supabaseClient';
 
 const getStatusInfo = (status: CampaignStatus) => {
     switch (status) {
@@ -15,18 +15,33 @@ const getStatusInfo = (status: CampaignStatus) => {
 
 const CampaignsPage: React.FC = () => {
     const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+    const [customers, setCustomers] = useState<Customer[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        setLoading(true);
-        setTimeout(() => {
-            const sortedCampaigns = [...mockCampaigns].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-            setCampaigns(sortedCampaigns);
+        const fetchData = async () => {
+            setLoading(true);
+            const { data: campaignsData, error: campaignsError } = await supabase
+                .from('campaigns')
+                .select('*')
+                .order('created_at', { ascending: false });
+            
+            const { data: customersData, error: customersError } = await supabase
+                .from('customers')
+                .select('id, name');
+
+            if (campaignsError || customersError) {
+                console.error(campaignsError, customersError);
+            } else {
+                setCampaigns(campaignsData || []);
+                setCustomers(customersData || []);
+            }
             setLoading(false);
-        }, 300);
+        };
+        fetchData();
     }, []);
 
-    const getTargetName = (target: 'all' | number) => {
+    const getTargetName = (target: string) => {
         if (target === 'all') {
             return (
                 <div className="flex items-center">
@@ -35,7 +50,7 @@ const CampaignsPage: React.FC = () => {
                 </div>
             );
         }
-        const customer = mockCustomers.find(c => c.id === target);
+        const customer = customers.find(c => c.id.toString() === target);
         return (
             <div className="flex items-center">
                 <User size={16} className="mr-2 text-gray-500" />
@@ -88,7 +103,7 @@ const CampaignsPage: React.FC = () => {
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                                             <div className="flex items-center">
                                                 <Calendar size={16} className="mr-2 text-gray-500"/>
-                                                {new Date(campaign.scheduledAt).toLocaleString('pt-BR')}
+                                                {new Date(campaign.scheduled_at).toLocaleString('pt-BR')}
                                             </div>
                                         </td>
                                     </tr>

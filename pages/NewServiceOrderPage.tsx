@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { ChevronLeft, User, Building, List, FileText, LoaderCircle, MapPin, PlusCircle, Trash2, Phone, Home, NotebookText, Wrench } from 'lucide-react';
-import { Customer, User as Technician, UserRole, ServiceType, ServiceOrderStatus, ServiceOrder, Material, Equipment } from '../types';
-import { mockCustomers, mockUsers, mockServiceOrders, mockEquipments } from '../data/mockData';
+import { Customer, User as Technician, UserRole, ServiceType, ServiceOrderStatus, Material, Equipment } from '../types';
+import { supabase } from '../lib/supabaseClient';
 
 const serviceTypeText: { [key in ServiceType]: string } = {
     [ServiceType.Preventiva]: 'Preventiva',
@@ -30,35 +30,52 @@ const NewServiceOrderPage: React.FC = () => {
     const [observations, setObservations] = useState('');
     const [materials, setMaterials] = useState<Material[]>([{ name: '', quantity: 1 }]);
     const [geolocationLink, setGeolocationLink] = useState('');
+    const [reportedProblem, setReportedProblem] = useState('');
 
     const [loading, setLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    useEffect(() => {
+    const fetchInitialData = useCallback(async () => {
         setLoading(true);
-        setTimeout(() => {
-            setCustomers(mockCustomers);
-            setTechnicians(mockUsers.filter(u => u.role === UserRole.Technician));
+        const { data: customersData, error: customersError } = await supabase.from('customers').select('*');
+        const { data: techniciansData, error: techniciansError } = await supabase.from('users').select('*').eq('role', UserRole.Technician);
+
+        if (customersError || techniciansError) {
+            console.error(customersError, techniciansError);
+        } else {
+            setCustomers(customersData || []);
+            setTechnicians(techniciansData || []);
             if (customerIdFromState) {
-                const initialCustomer = mockCustomers.find(c => c.id === customerIdFromState);
+                const initialCustomer = (customersData || []).find(c => c.id === customerIdFromState);
                 setSelectedCustomer(initialCustomer || null);
             }
-            setLoading(false);
-        }, 300);
+        }
+        setLoading(false);
     }, [customerIdFromState]);
 
     useEffect(() => {
-        if (selectedCustomerId) {
-            const customer = customers.find(c => c.id === parseInt(selectedCustomerId, 10));
-            setSelectedCustomer(customer || null);
-            const equipments = mockEquipments.filter(e => e.customer_id === parseInt(selectedCustomerId, 10));
-            setCustomerEquipments(equipments);
-            setSelectedEquipmentId(''); // Reset equipment selection
-        } else {
-            setSelectedCustomer(null);
+        fetchInitialData();
+    }, [fetchInitialData]);
+
+    const fetchEquipments = useCallback(async (customerId: string) => {
+        if (!customerId) {
             setCustomerEquipments([]);
+            return;
         }
-    }, [selectedCustomerId, customers]);
+        const { data, error } = await supabase.from('equipments').select('*').eq('customer_id', customerId);
+        if (error) {
+            console.error(error);
+        } else {
+            setCustomerEquipments(data || []);
+        }
+    }, []);
+
+    useEffect(() => {
+        const customer = customers.find(c => c.id.toString() === selectedCustomerId);
+        setSelectedCustomer(customer || null);
+        fetchEquipments(selectedCustomerId);
+        setSelectedEquipmentId('');
+    }, [selectedCustomerId, customers, fetchEquipments]);
     
     const handleMaterialChange = (index: number, field: keyof Material, value: string | number) => {
         const newMaterials = [...materials];
@@ -66,47 +83,47 @@ const NewServiceOrderPage: React.FC = () => {
         setMaterials(newMaterials);
     };
 
-    const addMaterial = () => {
-        setMaterials([...materials, { name: '', quantity: 1 }]);
-    };
-    
-    const removeMaterial = (index: number) => {
-        setMaterials(materials.filter((_, i) => i !== index));
-    };
+    const addMaterial = () => setMaterials([...materials, { name: '', quantity: 1 }]);
+    const removeMaterial = (index: number) => setMaterials(materials.filter((_, i) => i !== index));
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!selectedCustomerId || !serviceDescription) {
-            alert('Por favor, preencha o cliente e a descrição do serviço.');
+        if (!selectedCustomerId || !reportedProblem) {
+            alert('Por favor, preencha o cliente e o problema relatado.');
             return;
         }
         setIsSubmitting(true);
         
-        const technician = technicians.find(t => t.id === parseInt(selectedTechnicianId));
-
-        setTimeout(() => {
-            const newOrder: ServiceOrder = {
-                id: Math.max(...mockServiceOrders.map(o => o.id), 0) + 1,
+        const technician = technicians.find(t => t.id === selectedTechnicianId);
+        
+        const { data, error } = await supabase
+            .from('service_orders')
+            .insert({
                 customer_id: parseInt(selectedCustomerId, 10),
-                equipment_id: selectedEquipmentId ? parseInt(selectedEquipmentId, 10) : undefined,
-                technician_id: selectedTechnicianId ? parseInt(selectedTechnicianId, 10) : null,
-                reported_problem: serviceDescription.substring(0, 50) + '...', // Auto-generate from description
+                equipment_id: selectedEquipmentId ? parseInt(selectedEquipmentId, 10) : null,
+                technician_id: selectedTechnicianId || null,
+                reported_problem: reportedProblem,
                 service_description: serviceDescription,
-                observations,
+                observations: observations,
                 geolocation: geolocationLink,
                 service_type: serviceType,
                 status: selectedTechnicianId ? ServiceOrderStatus.Agendada : ServiceOrderStatus.AguardandoAgendamento,
                 required_materials: materials.filter(m => m.name),
-                created_at: new Date().toISOString(),
-            };
-            
-            mockServiceOrders.unshift(newOrder);
+            })
+            .select()
+            .single();
 
-            if (technician && technician.phone) {
-                const materialsList = newOrder.required_materials?.map(m => `- ${m.name} (Qtd: ${m.quantity})`).join('\n') || 'Nenhum';
-                const mapsLink = newOrder.geolocation ? `\n🗺️ *Localização:* ${newOrder.geolocation}` : '';
+        setIsSubmitting(false);
+
+        if (error) {
+            console.error(error);
+            alert('Erro ao criar Ordem de Serviço.');
+        } else {
+            if (technician?.phone) {
+                const materialsList = data.required_materials?.map((m: Material) => `- ${m.name} (Qtd: ${m.quantity})`).join('\n') || 'Nenhum';
+                const mapsLink = data.geolocation ? `\n🗺️ *Localização:* ${data.geolocation}` : '';
                 
-                const whatsappMessage = `*Nova Ordem de Serviço #${newOrder.id}*
+                const whatsappMessage = `*Nova Ordem de Serviço #${data.id}*
 -----------------------------
 *Cliente:* ${selectedCustomer?.name}
 *Telefone:* ${selectedCustomer?.contact_phone}
@@ -114,22 +131,20 @@ const NewServiceOrderPage: React.FC = () => {
 ${mapsLink}
 -----------------------------
 *Serviço a ser realizado:*
-${newOrder.service_description}
+${data.service_description}
 -----------------------------
 *Materiais Necessários:*
 ${materialsList}
 -----------------------------
 *Observações:*
-${newOrder.observations || 'Nenhuma'}
+${data.observations || 'Nenhuma'}
 `;
                 alert(`--- MENSAGEM PARA O WHATSAPP DO TÉCNICO ---\n\n(Simulação de Envio para ${technician.name})\n\n${whatsappMessage}`);
             } else {
-                alert('Ordem de Serviço criada com sucesso! (Mock)');
+                alert('Ordem de Serviço criada com sucesso!');
             }
-            
-            setIsSubmitting(false);
             navigate('/');
-        }, 500);
+        }
     };
     
     if (loading) {
@@ -139,8 +154,7 @@ ${newOrder.observations || 'Nenhuma'}
     return (
         <div className="space-y-6">
             <Link to="/service-orders" className="flex items-center gap-2 text-gray-600 hover:text-brand-dark">
-                <ChevronLeft size={20} />
-                Voltar
+                <ChevronLeft size={20} /> Voltar
             </Link>
 
             <div className="bg-white p-6 rounded-xl shadow-md max-w-4xl mx-auto">
@@ -164,13 +178,13 @@ ${newOrder.observations || 'Nenhuma'}
                         )}
                     </div>
                      {/* Equipment Section */}
-                     {selectedCustomerId && customerEquipments.length > 0 && (
+                     {selectedCustomerId && (
                          <div className="p-4 border rounded-lg">
                             <label htmlFor="equipment" className="flex items-center text-sm font-medium text-gray-700 mb-2">
                                 <Wrench size={16} className="mr-2"/> Equipamento
                             </label>
-                            <select id="equipment" value={selectedEquipmentId} onChange={e => setSelectedEquipmentId(e.target.value)} className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-brand-primary focus:border-brand-primary sm:text-sm">
-                                <option value="">Selecione um equipamento (Opcional)</option>
+                            <select id="equipment" value={selectedEquipmentId} onChange={e => setSelectedEquipmentId(e.target.value)} className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-brand-primary focus:border-brand-primary sm:text-sm" disabled={customerEquipments.length === 0}>
+                                <option value="">{customerEquipments.length > 0 ? 'Selecione um equipamento (Opcional)' : 'Nenhum equipamento cadastrado'}</option>
                                 {customerEquipments.map(e => <option key={e.id} value={e.id}>{e.name} - {e.brand} {e.model}</option>)}
                             </select>
                         </div>
@@ -178,6 +192,12 @@ ${newOrder.observations || 'Nenhuma'}
 
                     {/* Service Details Section */}
                     <div className="p-4 border rounded-lg space-y-4">
+                         <div>
+                            <label htmlFor="reportedProblem" className="flex items-center text-sm font-medium text-gray-700 mb-1">
+                                <FileText size={16} className="mr-2"/> Problema Relatado / Título <span className="text-red-500 ml-1">*</span>
+                            </label>
+                            <input type="text" id="reportedProblem" value={reportedProblem} onChange={e => setReportedProblem(e.target.value)} required className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-brand-primary focus:border-brand-primary sm:text-sm" placeholder="Ex: Ar condicionado não gela"/>
+                        </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
                                 <label htmlFor="serviceType" className="flex items-center text-sm font-medium text-gray-700 mb-1">
@@ -197,9 +217,9 @@ ${newOrder.observations || 'Nenhuma'}
 
                         <div>
                             <label htmlFor="serviceDescription" className="flex items-center text-sm font-medium text-gray-700 mb-1">
-                                <FileText size={16} className="mr-2"/> Descrição do Serviço <span className="text-red-500 ml-1">*</span>
+                                <FileText size={16} className="mr-2"/> Descrição Detalhada do Serviço
                             </label>
-                            <textarea id="serviceDescription" value={serviceDescription} onChange={e => setServiceDescription(e.target.value)} required rows={4} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-brand-primary focus:border-brand-primary sm:text-sm" placeholder="Descreva detalhadamente o serviço a ser realizado..."></textarea>
+                            <textarea id="serviceDescription" value={serviceDescription} onChange={e => setServiceDescription(e.target.value)} rows={4} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-brand-primary focus:border-brand-primary sm:text-sm" placeholder="Descreva detalhadamente o serviço a ser realizado..."></textarea>
                         </div>
                          <div>
                             <label htmlFor="observations" className="flex items-center text-sm font-medium text-gray-700 mb-1">

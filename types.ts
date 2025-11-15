@@ -5,12 +5,11 @@ export enum UserRole {
 }
 
 export interface User {
-  id: number;
+  id: string; // Changed to string for Supabase UUID
   name: string;
   email: string;
   role: UserRole;
   phone?: string;
-  password?: string;
 }
 
 export interface Customer {
@@ -21,6 +20,7 @@ export interface Customer {
   contact_name?: string;
   contact_email?: string;
   contact_phone?: string;
+  created_at: string;
 }
 
 export interface Equipment {
@@ -31,7 +31,8 @@ export interface Equipment {
     model?: string;
     serial_number?: string;
     capacity_btu?: number;
-    customers?: Customer;
+    created_at: string;
+    customers?: Customer; // For joins
 }
 
 export enum ServiceType {
@@ -60,7 +61,7 @@ export interface ServiceOrder {
     id: number;
     customer_id: number;
     equipment_id?: number | null;
-    technician_id?: number | null;
+    technician_id?: string | null; // Changed to string for Supabase UUID
     contract_id?: number;
     reported_problem: string;
     service_description?: string;
@@ -94,12 +95,12 @@ export interface Campaign {
     id: number;
     name: string;
     message: string;
-    mediaUrl?: string; // For preview
-    mediaType?: 'image' | 'video';
-    target: 'all' | number; // 'all' or customer_id
-    scheduledAt: string;
+    media_url?: string;
+    media_type?: 'image' | 'video';
+    target: string; // 'all' or customer_id as string
+    scheduled_at: string;
     status: CampaignStatus;
-    createdAt: string;
+    created_at: string;
 }
 
 export enum ContractStatus {
@@ -115,7 +116,8 @@ export interface Contract {
     start_date: string;
     end_date: string;
     frequency: 'mensal' | 'bimestral' | 'trimestral';
-    equipment_ids: number[];
+    created_at: string;
+    
     // For relational queries
     customers?: Customer;
     equipments?: Equipment[];

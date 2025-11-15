@@ -1,27 +1,38 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { User, UserRole } from '../types';
 import { Plus, Edit, Trash2, Search, LoaderCircle } from 'lucide-react';
-import { mockUsers } from '../data/mockData';
+import { supabase } from '../lib/supabaseClient';
 
 const TechniciansPage: React.FC = () => {
     const [technicians, setTechnicians] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
+    const [searchTerm, setSearchTerm] = useState('');
+
+    const fetchTechnicians = useCallback(async () => {
+        setLoading(true);
+        let query = supabase
+            .from('users')
+            .select('*')
+            .eq('role', UserRole.Technician);
+
+        if (searchTerm) {
+            query = query.ilike('name', `%${searchTerm}%`);
+        }
+        
+        const { data, error } = await query;
+        
+        if (error) {
+            console.error('Error fetching technicians:', error);
+        } else {
+            setTechnicians(data);
+        }
+        setLoading(false);
+    }, [searchTerm]);
 
     useEffect(() => {
-        const fetchTechnicians = () => {
-            setLoading(true);
-            
-            // MOCK LOGIC
-            setTimeout(() => {
-                const techUsers = mockUsers.filter(u => u.role === UserRole.Technician);
-                setTechnicians(techUsers);
-                setLoading(false);
-            }, 300);
-        };
         fetchTechnicians();
-    }, []);
+    }, [fetchTechnicians]);
 
     if (loading) {
         return <div className="flex justify-center items-center h-full"><LoaderCircle className="animate-spin h-12 w-12 text-brand-primary" /></div>;
@@ -40,6 +51,8 @@ const TechniciansPage: React.FC = () => {
                           type="text"
                           placeholder="Buscar técnico..."
                           className="w-full py-2 pl-10 pr-4 border rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
                       />
                     </div>
                     <Link to="/technicians/new" className="flex items-center gap-2 px-4 py-2 text-white bg-brand-primary rounded-lg hover:bg-brand-primary/90">

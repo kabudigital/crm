@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ChevronLeft, LoaderCircle, FileSignature, Building, Calendar, RefreshCw, Wrench, CheckCircle, XCircle, FileClock } from 'lucide-react';
-import { Contract, ServiceOrder, ContractStatus, ServiceOrderStatus, ServiceType } from '../types';
-import { getFullContracts, getFullServiceOrders } from '../data/mockData';
+import { Contract, ServiceOrder, ContractStatus, ServiceOrderStatus, ServiceType, Equipment } from '../types';
+import { supabase } from '../lib/supabaseClient';
+import QRCode from 'qrcode.react';
 
 const getStatusInfo = (status: ContractStatus) => {
     switch (status) {
@@ -16,23 +17,65 @@ const ContractDetailPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const [contract, setContract] = useState<Contract | null>(null);
     const [serviceOrders, setServiceOrders] = useState<ServiceOrder[]>([]);
+    const [equipments, setEquipments] = useState<Equipment[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!id) return;
-        setLoading(true);
-        setTimeout(() => {
-            const contractId = parseInt(id, 10);
-            const foundContract = getFullContracts().find(c => c.id === contractId);
-            setContract(foundContract as Contract || null);
+        const fetchContractData = async () => {
+            if (!id) return;
+            setLoading(true);
 
-            if (foundContract) {
-                const associatedOrders = getFullServiceOrders().filter(so => so.contract_id === contractId);
-                setServiceOrders(associatedOrders as ServiceOrder[]);
+            const contractId = parseInt(id, 10);
+            
+            // Fetch contract details
+            const { data: contractData, error: contractError } = await supabase
+                .from('contracts')
+                .select('*, customers (*)')
+                .eq('id', contractId)
+                .single();
+
+            if (contractError) {
+                console.error("Error fetching contract", contractError);
+                setLoading(false);
+                return;
+            }
+            setContract(contractData as unknown as Contract);
+
+            // Fetch associated equipments
+            const { data: contractEquipments, error: ceError } = await supabase
+                .from('contract_equipments')
+                .select('equipment_id')
+                .eq('contract_id', contractId);
+            
+            if (ceError) {
+                console.error("Error fetching contract equipments", ceError);
+            } else {
+                const equipmentIds = contractEquipments.map(ce => ce.equipment_id);
+                if (equipmentIds.length > 0) {
+                    const { data: equipmentData, error: eqError } = await supabase
+                        .from('equipments')
+                        .select('*')
+                        .in('id', equipmentIds);
+                    if (eqError) console.error("Error fetching equipments", eqError);
+                    else setEquipments(equipmentData);
+                }
             }
 
+            // Fetch associated service orders
+            const { data: ordersData, error: ordersError } = await supabase
+                .from('service_orders')
+                .select('*, equipments (*), users (*)')
+                .eq('contract_id', contractId);
+            
+            if (ordersError) {
+                console.error("Error fetching service orders", ordersError);
+            } else {
+                setServiceOrders(ordersData as ServiceOrder[]);
+            }
+            
             setLoading(false);
-        }, 300);
+        };
+        fetchContractData();
     }, [id]);
 
     if (loading) {
@@ -83,12 +126,20 @@ const ContractDetailPage: React.FC = () => {
             <div className="bg-white p-6 rounded-xl shadow-md">
                 <h2 className="text-xl font-bold text-brand-dark mb-4 flex items-center"><Wrench size={20} className="mr-2"/> Equipamentos Cobertos</h2>
                  <ul className="space-y-3">
-                   {contract.equipments?.map(eq => (
-                     <li key={eq.id} className="p-3 bg-gray-50 rounded-md">
-                       <p className="font-semibold text-gray-800">{eq.name}</p>
-                       <p className="text-xs text-gray-500">{eq.brand} {eq.model} (S/N: {eq.serial_number})</p>
-                     </li>
-                   ))}
+                   {equipments.map(eq => {
+                       const equipmentHistoryUrl = `${window.location.origin}/#/equipment/${eq.id}/pmoc-history`;
+                       return (
+                         <li key={eq.id} className="p-3 bg-gray-50 rounded-md flex justify-between items-center">
+                           <div>
+                               <p className="font-semibold text-gray-800">{eq.name}</p>
+                               <p className="text-xs text-gray-500">{eq.brand} {eq.model} (S/N: {eq.serial_number})</p>
+                           </div>
+                           <Link to={`/equipment/${eq.id}/pmoc-history`} title="Ver Histórico de Manutenção PMOC">
+                               <QRCode value={equipmentHistoryUrl} size={64} renderAs="svg" />
+                           </Link>
+                         </li>
+                       )
+                   })}
                  </ul>
             </div>
             

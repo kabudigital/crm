@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ChevronLeft, LoaderCircle, Image as ImageIcon, Video, Users, User, Calendar, Clock, MessageSquare } from 'lucide-react';
-import { Customer, Campaign, CampaignStatus } from '../types';
-import { mockCustomers, mockCampaigns } from '../data/mockData';
+import { Customer, CampaignStatus } from '../types';
+import { supabase } from '../lib/supabaseClient';
 
 const NewCampaignPage: React.FC = () => {
     const navigate = useNavigate();
     const [customers, setCustomers] = useState<Customer[]>([]);
+    const [loading, setLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     
     // Form state
@@ -21,8 +22,19 @@ const NewCampaignPage: React.FC = () => {
     const [scheduleTime, setScheduleTime] = useState('');
 
     useEffect(() => {
-        setCustomers(mockCustomers);
-        // Set default date and time
+        const fetchCustomers = async () => {
+            setLoading(true);
+            const { data, error } = await supabase.from('customers').select('id, name');
+            if (error) {
+                console.error(error);
+            } else {
+                setCustomers(data || []);
+            }
+            setLoading(false);
+        };
+
+        fetchCustomers();
+        
         const now = new Date();
         now.setMinutes(now.getMinutes() + 10); // 10 minutes from now
         setScheduleDate(now.toISOString().split('T')[0]);
@@ -41,7 +53,7 @@ const NewCampaignPage: React.FC = () => {
         }
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!name || !message || !scheduleDate || !scheduleTime || (targetType === 'individual' && !selectedCustomerId)) {
             alert('Por favor, preencha todos os campos obrigatórios.');
@@ -49,28 +61,34 @@ const NewCampaignPage: React.FC = () => {
         }
         setIsSubmitting(true);
         
-        setTimeout(() => {
-            const scheduledAt = new Date(`${scheduleDate}T${scheduleTime}`).toISOString();
-            
-            const newCampaign: Campaign = {
-                id: Math.max(...mockCampaigns.map(c => c.id), 0) + 1,
-                name,
-                message,
-                mediaUrl: mediaPreview || undefined,
-                mediaType: mediaType || undefined,
-                target: targetType === 'all' ? 'all' : parseInt(selectedCustomerId, 10),
-                scheduledAt,
-                status: CampaignStatus.Agendada,
-                createdAt: new Date().toISOString(),
-            };
+        // TODO: Handle media file upload to Supabase Storage
+        
+        const scheduled_at = new Date(`${scheduleDate}T${scheduleTime}`).toISOString();
+        
+        const { error } = await supabase.from('campaigns').insert({
+            name: name,
+            message: message,
+            // media_url: uploadedFileUrl,
+            // media_type: mediaType,
+            target: targetType === 'all' ? 'all' : selectedCustomerId,
+            scheduled_at: scheduled_at,
+            status: CampaignStatus.Agendada,
+        });
 
-            mockCampaigns.push(newCampaign);
-            
-            alert('Campanha agendada com sucesso! (Mock)');
-            setIsSubmitting(false);
+        setIsSubmitting(false);
+
+        if (error) {
+            console.error(error);
+            alert('Erro ao agendar campanha.');
+        } else {
+            alert('Campanha agendada com sucesso!');
             navigate('/campaigns');
-        }, 500);
+        }
     };
+    
+    if (loading) {
+        return <div className="flex justify-center items-center h-full"><LoaderCircle className="animate-spin h-12 w-12 text-brand-primary" /></div>;
+    }
 
     return (
         <div className="space-y-6">

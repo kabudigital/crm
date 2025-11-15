@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { LoaderCircle, Plus, FileSignature, CheckCircle, XCircle } from 'lucide-react';
 import { Contract, ContractStatus } from '../types';
-import { getFullContracts } from '../data/mockData';
+import { supabase } from '../lib/supabaseClient';
 
 const getStatusInfo = (status: ContractStatus) => {
     switch (status) {
@@ -20,11 +20,20 @@ const ContractsPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        setLoading(true);
-        setTimeout(() => {
-            setContracts(getFullContracts() as Contract[]);
+        const fetchContracts = async () => {
+            setLoading(true);
+            const { data, error } = await supabase
+                .from('contracts')
+                .select('*, customers (name)');
+            
+            if (error) {
+                console.error('Error fetching contracts:', error);
+            } else {
+                setContracts(data as unknown as Contract[]);
+            }
             setLoading(false);
-        }, 300);
+        };
+        fetchContracts();
     }, []);
 
     if (loading) {

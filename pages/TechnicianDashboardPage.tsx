@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useOutletContext } from 'react-router-dom';
 import { User, ServiceOrder, ServiceOrderStatus } from '../types';
 import TimeClock from '../components/TimeClock';
-import { getFullServiceOrders } from '../data/mockData';
+import { supabase } from '../lib/supabaseClient';
 import { LoaderCircle } from 'lucide-react';
 
 const statusText: { [key in ServiceOrderStatus]: string } = {
@@ -33,24 +33,29 @@ const TechnicianDashboardPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!technician?.id) {
-        setLoading(false);
-        return;
-    }
+    const fetchAssignedOrders = async () => {
+      if (!technician?.id) {
+          setLoading(false);
+          return;
+      }
+      setLoading(true);
 
-    setLoading(true);
-    // MOCK LOGIC
-    setTimeout(() => {
-        const allOrders = getFullServiceOrders();
-        const techOrders = allOrders.filter(o => 
-            o.technician_id === technician.id &&
-            o.status !== ServiceOrderStatus.Concluida &&
-            o.status !== ServiceOrderStatus.Cancelada
-        ).sort((a,b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+      const { data, error } = await supabase
+        .from('service_orders')
+        .select('*, customers (*)')
+        .eq('technician_id', technician.id)
+        .in('status', ['agendada', 'em_execucao', 'aguardando_peca'])
+        .order('created_at', { ascending: true });
 
-        setAssignedOrders(techOrders as ServiceOrder[]);
-        setLoading(false);
-    }, 300);
+      if (error) {
+        console.error('Error fetching assigned orders:', error);
+      } else {
+        setAssignedOrders(data as ServiceOrder[]);
+      }
+      setLoading(false);
+    };
+
+    fetchAssignedOrders();
   }, [technician]);
   
   if (!technician?.id) {

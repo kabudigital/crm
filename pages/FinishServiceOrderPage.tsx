@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ServiceOrder, ServiceOrderStatus } from '../types';
-import { mockServiceOrders, getFullServiceOrders } from '../data/mockData';
+import { supabase } from '../lib/supabaseClient';
 import { ChevronLeft, LoaderCircle, FileText, UserCheck, Camera } from 'lucide-react';
 
 const FinishServiceOrderPage: React.FC = () => {
@@ -17,39 +17,56 @@ const FinishServiceOrderPage: React.FC = () => {
     const [photos, setPhotos] = useState<File[]>([]);
 
     useEffect(() => {
-        if (!id) return;
-        setLoading(true);
-        setTimeout(() => {
-            const foundOrder = getFullServiceOrders().find(o => o.id === parseInt(id, 10));
-            setOrder(foundOrder as ServiceOrder || null);
+        const fetchOrder = async () => {
+            if (!id) return;
+            setLoading(true);
+            
+            const { data, error } = await supabase
+                .from('service_orders')
+                .select('*, customers (*)')
+                .eq('id', parseInt(id, 10))
+                .single();
+            
+            if (error) {
+                console.error("Error fetching order for finishing", error);
+            } else {
+                setOrder(data as ServiceOrder);
+            }
             setLoading(false);
-        }, 300);
+        };
+        fetchOrder();
     }, [id]);
     
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!technicalReport || !completedBy) {
+        if (!technicalReport || !completedBy || !id) {
             alert('Por favor, preencha o relatório técnico e o nome do responsável.');
             return;
         }
         setIsSubmitting(true);
         
-        setTimeout(() => {
-            const orderIndex = mockServiceOrders.findIndex(o => o.id === parseInt(id!, 10));
-            if (orderIndex !== -1) {
-                mockServiceOrders[orderIndex] = {
-                    ...mockServiceOrders[orderIndex],
-                    status: ServiceOrderStatus.Concluida,
-                    technical_report: technicalReport,
-                    completed_by_customer: completedBy,
-                    photos_urls: photos.map(p => `/uploads/mock/${p.name}`), // Mocked photo URLs
-                    completed_at: new Date().toISOString(),
-                };
-            }
+        // TODO: Handle photo uploads to Supabase Storage
+        
+        const { error } = await supabase
+            .from('service_orders')
+            .update({
+                status: ServiceOrderStatus.Concluida,
+                technical_report: technicalReport,
+                completed_by_customer: completedBy,
+                // photos_urls: photoUrls,
+                completed_at: new Date().toISOString(),
+            })
+            .eq('id', parseInt(id, 10));
+
+        setIsSubmitting(false);
+
+        if (error) {
+            console.error("Error finishing service order", error);
+            alert('Erro ao finalizar a Ordem de Serviço.');
+        } else {
             alert('Ordem de Serviço finalizada com sucesso!');
-            setIsSubmitting(false);
             navigate(`/service-orders/${id}`);
-        }, 500);
+        }
     };
 
     if (loading) {

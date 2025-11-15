@@ -2,33 +2,43 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { LoaderCircle, CheckCircle, Clock } from 'lucide-react';
 import { ServiceOrder, ServiceOrderStatus, ServiceType } from '../types';
-import { getFullServiceOrders, mockServiceOrders } from '../data/mockData';
+import { supabase } from '../lib/supabaseClient';
 
 const QuotesPage: React.FC = () => {
     const [quotes, setQuotes] = useState<ServiceOrder[]>([]);
     const [loading, setLoading] = useState(true);
 
-    const fetchQuotes = () => {
+    const fetchQuotes = async () => {
         setLoading(true);
-        setTimeout(() => {
-            const quoteOrders = getFullServiceOrders()
-                .filter(so => so.service_type === ServiceType.Orcamento && so.status !== ServiceOrderStatus.Aprovado)
-                .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-            setQuotes(quoteOrders as ServiceOrder[]);
-            setLoading(false);
-        }, 300);
+        const { data, error } = await supabase
+            .from('service_orders')
+            .select('*, customers (name)')
+            .eq('service_type', ServiceType.Orcamento)
+            .neq('status', ServiceOrderStatus.Aprovado)
+            .order('created_at', { ascending: false });
+        
+        if (error) {
+            console.error("Error fetching quotes", error);
+        } else {
+            setQuotes(data as ServiceOrder[]);
+        }
+        setLoading(false);
     };
 
     useEffect(() => {
         fetchQuotes();
     }, []);
     
-    const handleApproveQuote = (quoteId: number) => {
-        const orderIndex = mockServiceOrders.findIndex(o => o.id === quoteId);
-        if (orderIndex !== -1) {
-            mockServiceOrders[orderIndex].status = ServiceOrderStatus.AguardandoAgendamento;
-            // Optionally change service type upon approval
-            // mockServiceOrders[orderIndex].service_type = ServiceType.Instalacao;
+    const handleApproveQuote = async (quoteId: number) => {
+        const { error } = await supabase
+            .from('service_orders')
+            .update({ status: ServiceOrderStatus.AguardandoAgendamento })
+            .eq('id', quoteId);
+
+        if (error) {
+            console.error("Error approving quote", error);
+            alert("Erro ao aprovar orçamento.");
+        } else {
             alert(`Orçamento #${quoteId} aprovado! Agora ele pode ser encontrado na lista principal de Ordens de Serviço.`);
             fetchQuotes(); // Re-fetch to update the list
         }

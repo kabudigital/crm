@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
-import { mockCustomers } from '../data/mockData';
-import { Customer } from '../types';
+import { supabase } from '../lib/supabaseClient';
 
 const NewCustomerPage: React.FC = () => {
     const [name, setName] = useState('');
@@ -14,27 +13,29 @@ const NewCustomerPage: React.FC = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const navigate = useNavigate();
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSubmitting(true);
 
-        // MOCK LOGIC
-        setTimeout(() => {
-            const newCustomer: Customer = {
-                id: Math.max(...mockCustomers.map(c => c.id)) + 1,
-                name,
+        const { error } = await supabase
+            .from('customers')
+            .insert({
+                name: name,
                 cnpj_cpf: cnpj,
-                address,
+                address: address,
                 contact_name: contactName,
                 contact_email: contactEmail,
                 contact_phone: contactPhone,
-            };
-            mockCustomers.push(newCustomer); // Note: this won't persist on other pages without state management
-            
-            alert('Cliente cadastrado com sucesso! (Mock)');
-            setIsSubmitting(false);
+            });
+
+        setIsSubmitting(false);
+        if (error) {
+            console.error('Error creating customer:', error);
+            alert('Erro ao cadastrar cliente.');
+        } else {
+            alert('Cliente cadastrado com sucesso!');
             navigate('/customers');
-        }, 500);
+        }
     };
 
     return (

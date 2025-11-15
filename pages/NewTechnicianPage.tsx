@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
-import { UserRole, User } from '../types';
-import { mockUsers } from '../data/mockData';
+import { UserRole } from '../types';
+import { supabase } from '../lib/supabaseClient';
+import { AuthApiError } from '@supabase/supabase-js';
 
 const NewTechnicianPage: React.FC = () => {
     const [name, setName] = useState('');
@@ -10,35 +11,38 @@ const NewTechnicianPage: React.FC = () => {
     const [phone, setPhone] = useState('');
     const [password, setPassword] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [error, setError] = useState('');
     const navigate = useNavigate();
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setError('');
         setIsSubmitting(true);
         
-        // MOCK LOGIC
-        setTimeout(() => {
-            const existingUser = mockUsers.find(u => u.email === email);
-            if (existingUser) {
-                alert('Erro: Este email já está cadastrado. (Mock)');
-                setIsSubmitting(false);
-                return;
+        const { error } = await supabase.auth.signUp({
+            email: email,
+            password: password,
+            options: {
+                data: {
+                    name: name,
+                    role: UserRole.Technician,
+                    phone: phone,
+                }
             }
+        });
 
-            const newTechnician: User = {
-                id: Math.max(...mockUsers.map(u => u.id)) + 1,
-                name,
-                email,
-                phone,
-                password,
-                role: UserRole.Technician,
-            };
-            mockUsers.push(newTechnician);
+        setIsSubmitting(false);
 
-            alert('Técnico cadastrado com sucesso! (Mock)');
-            setIsSubmitting(false);
+        if (error) {
+            if (error instanceof AuthApiError) {
+                setError(error.message);
+            } else {
+                setError('Ocorreu um erro inesperado no cadastro.');
+            }
+        } else {
+            alert('Técnico cadastrado com sucesso! Um email de confirmação foi enviado.');
             navigate('/technicians');
-        }, 500);
+        }
     };
 
     return (
@@ -67,6 +71,7 @@ const NewTechnicianPage: React.FC = () => {
                         <label htmlFor="password" className="block text-sm font-medium text-gray-700">Senha</label>
                         <input type="password" id="password" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-brand-primary focus:border-brand-primary sm:text-sm" />
                     </div>
+                    {error && <p className="text-red-500 text-sm text-center">{error}</p>}
                     <div className="flex justify-end gap-4 pt-4">
                         <Link to="/technicians" className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">Cancelar</Link>
                         <button type="submit" disabled={isSubmitting} className="px-4 py-2 bg-brand-primary text-white rounded-md text-sm font-medium hover:bg-brand-primary/90 disabled:bg-gray-400">

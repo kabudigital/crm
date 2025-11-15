@@ -13,7 +13,8 @@ export default defineConfig({
         'recharts',
         'lucide-react',
         'qrcode.react',
-        '@supabase/supabase-js'
+        '@supabase/supabase-js',
+        'react/jsx-runtime'
       ]
     }
   }

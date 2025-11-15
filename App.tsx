@@ -1,7 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { HashRouter, Routes, Route } from 'react-router-dom';
-import Sidebar from './components/Sidebar';
-import Header from './components/Header';
 import DashboardPage from './pages/DashboardPage';
 import ServiceOrdersPage from './pages/ContractsPage';
 import ServiceOrderDetailPage from './pages/ContractDetailPage';
@@ -10,9 +8,12 @@ import CustomerDetailPage from './pages/CustomerDetailPage';
 import TechniciansPage from './pages/UsersPage';
 import NewCustomerPage from './pages/NewCustomerPage';
 import NewTechnicianPage from './pages/NewTechnicianPage';
+import NewServiceOrderPage from './pages/NewServiceOrderPage';
 import AuthPage from './pages/AuthPage';
 import TechnicianDashboardPage from './pages/TechnicianDashboardPage';
 import { User, UserRole } from './types';
+import AdminLayout from './components/AdminLayout';
+import TechnicianLayout from './components/TechnicianLayout';
 
 const App: React.FC = () => {
   const [loggedInUser, setLoggedInUser] = useState<User | null>(() => {
@@ -43,28 +44,26 @@ const App: React.FC = () => {
 
   return (
     <HashRouter>
-      {isAdmin ? (
-        <div className="flex h-screen bg-gray-100 font-sans">
-          <Sidebar user={loggedInUser} onLogout={handleLogout} />
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <Header />
-            <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 p-4 md:p-6 lg:p-8">
-              <Routes>
-                <Route path="/" element={<DashboardPage />} />
-                <Route path="/service-orders" element={<ServiceOrdersPage />} />
-                <Route path="/service-orders/:id" element={<ServiceOrderDetailPage />} />
-                <Route path="/customers" element={<CustomersPage />} />
-                <Route path="/customers/:id" element={<CustomerDetailPage />} />
-                <Route path="/customers/new" element={<NewCustomerPage />} />
-                <Route path="/technicians" element={<TechniciansPage />} />
-                <Route path="/technicians/new" element={<NewTechnicianPage />} />
-              </Routes>
-            </main>
-          </div>
-        </div>
-      ) : (
-        <TechnicianDashboardPage technician={loggedInUser} onLogout={handleLogout} />
-      )}
+      <Routes>
+        {isAdmin ? (
+          <Route element={<AdminLayout user={loggedInUser} onLogout={handleLogout} />}>
+            <Route path="/" element={<DashboardPage />} />
+            <Route path="/service-orders" element={<ServiceOrdersPage />} />
+            <Route path="/service-orders/new" element={<NewServiceOrderPage />} />
+            <Route path="/service-orders/:id" element={<ServiceOrderDetailPage />} />
+            <Route path="/customers" element={<CustomersPage />} />
+            <Route path="/customers/:id" element={<CustomerDetailPage />} />
+            <Route path="/customers/new" element={<NewCustomerPage />} />
+            <Route path="/technicians" element={<TechniciansPage />} />
+            <Route path="/technicians/new" element={<NewTechnicianPage />} />
+          </Route>
+        ) : (
+          <Route element={<TechnicianLayout technician={loggedInUser} onLogout={handleLogout} />}>
+            <Route path="/" element={<TechnicianDashboardPage />} />
+            <Route path="/service-orders/:id" element={<ServiceOrderDetailPage />} />
+          </Route>
+        )}
+      </Routes>
     </HashRouter>
   );
 };

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, Plus, SlidersHorizontal, LoaderCircle } from 'lucide-react';
 import { ServiceOrder, ServiceOrderStatus } from '../types';
-import { supabase } from '../lib/supabaseClient';
+import { getFullServiceOrders } from '../data/mockData';
 
 const getStatusClass = (status: ServiceOrderStatus) => {
     switch (status) {
@@ -54,25 +54,32 @@ const ServiceOrdersPage: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('todos');
 
-    const fetchOrders = useCallback(async () => {
+    const fetchOrders = useCallback(() => {
         setLoading(true);
-        let query = supabase.from('service_orders').select('*, customers(name)');
         
-        if (statusFilter !== 'todos') {
-            query = query.eq('status', statusFilter);
-        }
-        
-        if (searchTerm) {
-            query = query.ilike('reported_problem', `%${searchTerm}%`);
-        }
-        
-        query = query.order('created_at', { ascending: false });
+        // MOCK LOGIC
+        setTimeout(() => {
+            let filteredOrders = getFullServiceOrders();
 
-        const { data, error } = await query;
-        if (data) {
-            setOrders(data as ServiceOrder[]);
-        }
-        setLoading(false);
+            if (statusFilter !== 'todos') {
+                filteredOrders = filteredOrders.filter(o => o.status === statusFilter);
+            }
+            
+            if (searchTerm) {
+                const lowerSearchTerm = searchTerm.toLowerCase();
+                filteredOrders = filteredOrders.filter(o => 
+                    o.reported_problem.toLowerCase().includes(lowerSearchTerm) ||
+                    o.customers?.name.toLowerCase().includes(lowerSearchTerm) ||
+                    o.id.toString().includes(lowerSearchTerm)
+                );
+            }
+
+            filteredOrders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+            
+            setOrders(filteredOrders as ServiceOrder[]);
+            setLoading(false);
+        }, 300);
+
     }, [searchTerm, statusFilter]);
 
     useEffect(() => {
@@ -88,7 +95,7 @@ const ServiceOrdersPage: React.FC = () => {
                     </span>
                     <input
                         type="text"
-                        placeholder="Buscar por problema relatado..."
+                        placeholder="Buscar por OS, cliente ou problema..."
                         className="w-full py-2 pl-10 pr-4 border rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-primary"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
@@ -108,10 +115,10 @@ const ServiceOrdersPage: React.FC = () => {
                     <button className="p-2 border rounded-lg hover:bg-gray-100">
                         <SlidersHorizontal size={20} />
                     </button>
-                    <button className="flex items-center gap-2 px-4 py-2 text-white bg-brand-primary rounded-lg hover:bg-brand-primary/90">
+                    <Link to="/service-orders/new" className="flex items-center gap-2 px-4 py-2 text-white bg-brand-primary rounded-lg hover:bg-brand-primary/90">
                         <Plus size={20} />
                         Nova O.S.
-                    </button>
+                    </Link>
                 </div>
             </div>
 

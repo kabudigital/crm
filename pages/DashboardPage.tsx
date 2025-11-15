@@ -4,7 +4,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 import StatCard from '../components/StatCard';
 import { Link } from 'react-router-dom';
 import { ServiceOrder, ServiceOrderStatus, Customer, User, UserRole } from '../types';
-import { supabase } from '../lib/supabaseClient';
+import { getFullServiceOrders, mockCustomers, mockUsers } from '../data/mockData';
 
 const serviceData = [
     { month: 'Jan', count: 12 },
@@ -23,21 +23,20 @@ const DashboardPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const fetchData = async () => {
+        const fetchData = () => {
             setLoading(true);
-            const { data: soData, error: soError } = await supabase
-                .from('service_orders')
-                .select('*, customers(name)');
-            const { data: customerData, error: customerError } = await supabase.from('customers').select('*');
-            const { data: userData, error: userError } = await supabase.from('users').select('*');
+            
+            // MOCK DATA
+            const allServiceOrders = getFullServiceOrders();
+            const allCustomers = mockCustomers;
+            const allUsers = mockUsers;
 
-            if (soData) setServiceOrders(soData as ServiceOrder[]);
-            if (customerData) setCustomers(customerData);
-            if (userData) {
-                setUsers(userData);
-                setTechnicians(userData.filter(u => u.role === UserRole.Technician));
-            }
-            setLoading(false);
+            setServiceOrders(allServiceOrders as ServiceOrder[]);
+            setCustomers(allCustomers);
+            setUsers(allUsers);
+            setTechnicians(allUsers.filter(u => u.role === UserRole.Technician));
+            
+            setTimeout(() => setLoading(false), 500); // Simulate loading
         };
 
         fetchData();

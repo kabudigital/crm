@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ChevronLeft, Mail, Phone, MapPin, Plus, LoaderCircle } from 'lucide-react';
 import { Customer, ServiceOrder, ServiceOrderStatus } from '../types';
-import { supabase } from '../lib/supabaseClient';
+import { mockCustomers, getFullServiceOrders } from '../data/mockData';
 
 const statusText: { [key in ServiceOrderStatus]: string } = {
     [ServiceOrderStatus.AguardandoAgendamento]: 'Aguardando Agendamento',
@@ -32,28 +32,22 @@ const CustomerDetailPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const fetchCustomerData = async () => {
+        const fetchCustomerData = () => {
             if (!id) return;
             setLoading(true);
 
-            // Fetch customer details
-            const { data: customerData, error: customerError } = await supabase
-                .from('customers')
-                .select('*')
-                .eq('id', id)
-                .single();
+            // MOCK LOGIC
+            setTimeout(() => {
+                const customerId = parseInt(id, 10);
+                const foundCustomer = mockCustomers.find(c => c.id === customerId);
+                const customerOrders = getFullServiceOrders()
+                    .filter(so => so.customer_id === customerId)
+                    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-            // Fetch service orders for this customer
-            const { data: soData, error: soError } = await supabase
-                .from('service_orders')
-                .select('*')
-                .eq('customer_id', id)
-                .order('created_at', { ascending: false });
-
-            if (customerData) setCustomer(customerData);
-            if (soData) setServiceOrders(soData as ServiceOrder[]);
-            
-            setLoading(false);
+                setCustomer(foundCustomer || null);
+                setServiceOrders(customerOrders as ServiceOrder[]);
+                setLoading(false);
+            }, 300);
         };
         fetchCustomerData();
     }, [id]);
@@ -117,9 +111,9 @@ const CustomerDetailPage: React.FC = () => {
             <div className="bg-white p-6 rounded-xl shadow-md">
                  <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-bold text-brand-dark">Ordens de Serviço</h2>
-                    <button className="flex items-center gap-2 px-4 py-2 text-white bg-brand-primary rounded-lg text-sm hover:bg-brand-primary/90">
+                    <Link to="/service-orders/new" state={{ customerId: customer.id }} className="flex items-center gap-2 px-4 py-2 text-white bg-brand-primary rounded-lg text-sm hover:bg-brand-primary/90">
                         <Plus size={16}/>Nova O.S. para este cliente
-                    </button>
+                    </Link>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200">

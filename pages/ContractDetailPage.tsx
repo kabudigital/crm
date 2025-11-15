@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ChevronLeft, User, Building, Calendar, CheckCircle, XCircle, LoaderCircle, Wrench, Package, List, Clock } from 'lucide-react';
 import { ServiceOrder, ServiceOrderStatus, ServiceType } from '../types';
-import { supabase } from '../lib/supabaseClient';
+import { getFullServiceOrders } from '../data/mockData';
 
 const statusText: { [key in ServiceOrderStatus]: string } = {
     [ServiceOrderStatus.AguardandoAgendamento]: 'Aguardando Agendamento',
@@ -31,19 +31,17 @@ const ServiceOrderDetailPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const fetchOrder = async () => {
+        const fetchOrder = () => {
             if (!id) return;
             setLoading(true);
-            const { data, error } = await supabase
-                .from('service_orders')
-                .select('*, customers(*), users(*), equipments(*)')
-                .eq('id', id)
-                .single();
-            
-            if (data) {
-                setOrder(data as ServiceOrder);
-            }
-            setLoading(false);
+
+            // MOCK LOGIC
+            setTimeout(() => {
+                const allOrders = getFullServiceOrders();
+                const foundOrder = allOrders.find(o => o.id === parseInt(id, 10));
+                setOrder(foundOrder || null);
+                setLoading(false);
+            }, 300);
         };
 
         fetchOrder();

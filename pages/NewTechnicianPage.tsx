@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
-import { supabase } from '../lib/supabaseClient';
-import { UserRole } from '../types';
+import { UserRole, User } from '../types';
+import { mockUsers } from '../data/mockData';
 
 const NewTechnicianPage: React.FC = () => {
     const [name, setName] = useState('');
@@ -12,37 +12,33 @@ const NewTechnicianPage: React.FC = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const navigate = useNavigate();
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         setIsSubmitting(true);
+        
+        // MOCK LOGIC
+        setTimeout(() => {
+            const existingUser = mockUsers.find(u => u.email === email);
+            if (existingUser) {
+                alert('Erro: Este email já está cadastrado. (Mock)');
+                setIsSubmitting(false);
+                return;
+            }
 
-        const { error: existingUserError, data: existingUser } = await supabase
-            .from('users')
-            .select('id')
-            .eq('email', email)
-            .single();
+            const newTechnician: User = {
+                id: Math.max(...mockUsers.map(u => u.id)) + 1,
+                name,
+                email,
+                phone,
+                password,
+                role: UserRole.Technician,
+            };
+            mockUsers.push(newTechnician);
 
-        if (existingUser) {
-            alert('Erro: Este email já está cadastrado.');
+            alert('Técnico cadastrado com sucesso! (Mock)');
             setIsSubmitting(false);
-            return;
-        }
-
-        const { error } = await supabase.from('users').insert({
-            name,
-            email,
-            phone,
-            password, // AVISO: Não é seguro em produção!
-            role: UserRole.Technician,
-        });
-
-        if (error) {
-            alert('Erro ao cadastrar técnico: ' + error.message);
-            setIsSubmitting(false);
-        } else {
-            alert('Técnico cadastrado com sucesso!');
             navigate('/technicians');
-        }
+        }, 500);
     };
 
     return (

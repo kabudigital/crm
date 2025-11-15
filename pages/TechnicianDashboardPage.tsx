@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { Link, useOutletContext } from 'react-router-dom';
 import { User, ServiceOrder, ServiceOrderStatus } from '../types';
-import TechnicianHeader from '../components/TechnicianHeader';
 import TimeClock from '../components/TimeClock';
-import { supabase } from '../lib/supabaseClient';
+import { getFullServiceOrders } from '../data/mockData';
 import { LoaderCircle } from 'lucide-react';
 
 const statusText: { [key in ServiceOrderStatus]: string } = {
@@ -24,53 +24,62 @@ const getStatusClass = (status: ServiceOrderStatus) => {
     }
 };
 
-// FIX: Defined props interface for TechnicianDashboardPage component.
-interface TechnicianDashboardPageProps {
-  technician: User;
-  onLogout: () => void;
-}
-
-const TechnicianDashboardPage: React.FC<TechnicianDashboardPageProps> = ({ technician, onLogout }) => {
+const TechnicianDashboardPage: React.FC = () => {
+  const context = useOutletContext<{ technician: User }>();
+  const technician = context?.technician;
   const [assignedOrders, setAssignedOrders] = useState<ServiceOrder[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchAssignedOrders = async () => {
-        setLoading(true);
-        const { data, error } = await supabase
-            .from('service_orders')
-            .select('*, customers(name)')
-            .eq('technician_id', technician.id)
-            .neq('status', ServiceOrderStatus.Concluida)
-            .neq('status', ServiceOrderStatus.Cancelada)
-            .order('created_at', { ascending: true });
+    if (!technician) {
+      setLoading(false);
+      return;
+    }
 
-        if (data) {
-            setAssignedOrders(data as ServiceOrder[]);
-        }
-        setLoading(false);
+    const fetchAssignedOrders = () => {
+        setLoading(true);
+
+        // MOCK LOGIC
+        setTimeout(() => {
+            const allOrders = getFullServiceOrders();
+            const techOrders = allOrders.filter(o => 
+                o.technician_id === technician.id &&
+                o.status !== ServiceOrderStatus.Concluida &&
+                o.status !== ServiceOrderStatus.Cancelada
+            ).sort((a,b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+            setAssignedOrders(techOrders as ServiceOrder[]);
+            setLoading(false);
+        }, 300);
     };
 
     fetchAssignedOrders();
-  }, [technician.id]);
+  }, [technician]);
+  
+  if (!technician && !loading) {
+    return (
+        <div className="text-center p-10">
+            <h1 className="text-xl font-bold text-red-500">Erro ao carregar dados do técnico.</h1>
+            <p className="text-gray-600">Por favor, tente fazer login novamente.</p>
+        </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gray-100 font-sans flex flex-col">
-      <TechnicianHeader technician={technician} onLogout={onLogout} />
-      <main className="flex-1 p-4 md:p-6 lg:p-8">
-        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-1">
-             <TimeClock />
-          </div>
-          <div className="lg:col-span-2">
-            <div className="bg-white p-6 rounded-xl shadow-md">
-                <h2 className="text-xl font-bold text-brand-dark mb-4">Minhas Ordens de Serviço Abertas</h2>
-                {loading ? (
-                    <div className="flex justify-center items-center p-10"><LoaderCircle className="animate-spin h-8 w-8 text-brand-primary" /></div>
-                ) : assignedOrders.length > 0 ? (
-                    <ul className="space-y-4">
-                        {assignedOrders.map(order => (
-                           <li key={order.id} className={`bg-white p-4 rounded-lg shadow-sm hover:shadow-md transition-shadow ${getStatusClass(order.status)}`}>
+    <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="lg:col-span-1">
+         <TimeClock />
+      </div>
+      <div className="lg:col-span-2">
+        <div className="bg-white p-6 rounded-xl shadow-md">
+            <h2 className="text-xl font-bold text-brand-dark mb-4">Minhas Ordens de Serviço Abertas</h2>
+            {loading ? (
+                <div className="flex justify-center items-center p-10"><LoaderCircle className="animate-spin h-8 w-8 text-brand-primary" /></div>
+            ) : assignedOrders.length > 0 ? (
+                <ul className="space-y-4">
+                    {assignedOrders.map(order => (
+                       <li key={order.id}>
+                           <Link to={`/service-orders/${order.id}`} className={`block bg-white p-4 rounded-lg shadow-sm hover:shadow-md transition-shadow ${getStatusClass(order.status)}`}>
                                <div className="flex justify-between items-start">
                                    <div>
                                        <p className="font-bold text-brand-dark">{order.reported_problem}</p>
@@ -81,16 +90,15 @@ const TechnicianDashboardPage: React.FC<TechnicianDashboardPageProps> = ({ techn
                                <p className="text-right text-xs text-gray-400 mt-2">
                                    Aberta em: {new Date(order.created_at).toLocaleDateString()}
                                </p>
-                           </li>
-                        ))}
-                    </ul>
-                ) : (
-                    <p className="text-center text-gray-500 py-8">Você não tem nenhuma ordem de serviço pendente. Bom trabalho!</p>
-                )}
-            </div>
-          </div>
+                           </Link>
+                       </li>
+                    ))}
+                </ul>
+            ) : (
+                <p className="text-center text-gray-500 py-8">Você não tem nenhuma ordem de serviço pendente. Bom trabalho!</p>
+            )}
         </div>
-      </main>
+      </div>
     </div>
   );
 };

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, Plus, Building, Mail, Phone, LoaderCircle } from 'lucide-react';
 import { Customer } from '../types';
-import { supabase } from '../lib/supabaseClient';
+import { mockCustomers } from '../data/mockData';
 
 const CustomerCard: React.FC<{ customer: Customer }> = ({ customer }) => {
     return (
@@ -40,21 +40,22 @@ const CustomersPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
 
-    const fetchCustomers = useCallback(async () => {
+    const fetchCustomers = useCallback(() => {
         setLoading(true);
-        let query = supabase.from('customers').select('*');
+        
+        // MOCK LOGIC
+        setTimeout(() => {
+            let filteredCustomers = mockCustomers;
 
-        if (searchTerm) {
-            query = query.ilike('name', `%${searchTerm}%`);
-        }
-        
-        query = query.order('name', { ascending: true });
-        
-        const { data, error } = await query;
-        if (data) {
-            setCustomers(data);
-        }
-        setLoading(false);
+            if (searchTerm) {
+                filteredCustomers = mockCustomers.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()));
+            }
+            
+            filteredCustomers.sort((a, b) => a.name.localeCompare(b.name));
+            
+            setCustomers(filteredCustomers);
+            setLoading(false);
+        }, 300);
     }, [searchTerm]);
 
     useEffect(() => {

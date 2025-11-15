@@ -2,24 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { User, UserRole } from '../types';
 import { Plus, Edit, Trash2, Search, LoaderCircle } from 'lucide-react';
-import { supabase } from '../lib/supabaseClient';
+import { mockUsers } from '../data/mockData';
 
 const TechniciansPage: React.FC = () => {
     const [technicians, setTechnicians] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const fetchTechnicians = async () => {
+        const fetchTechnicians = () => {
             setLoading(true);
-            const { data, error } = await supabase
-                .from('users')
-                .select('*')
-                .eq('role', UserRole.Technician);
             
-            if (data) {
-                setTechnicians(data);
-            }
-            setLoading(false);
+            // MOCK LOGIC
+            setTimeout(() => {
+                const techUsers = mockUsers.filter(u => u.role === UserRole.Technician);
+                setTechnicians(techUsers);
+                setLoading(false);
+            }, 300);
         };
         fetchTechnicians();
     }, []);

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Printer, ChevronLeft, LoaderCircle, MapPin, HardHat, Calendar, Wrench, Settings, FileText } from 'lucide-react';
-import * as qrcode from 'qrcode.react';
+import { QRCodeSVG } from 'qrcode.react';
 import { ServiceOrder } from '../types';
 import { supabase } from '../lib/supabaseClient';
 
@@ -50,7 +50,7 @@ const PmocLabelPage: React.FC = () => {
 
     const equipment = order.equipments;
     const technician = order.users;
-    const equipmentUrl = `${window.location.origin}/#/equipment/${equipment.id}`;
+    const equipmentUrl = `${window.location.origin}/equipment/${equipment.id}`;
 
     return (
         <>
@@ -130,7 +130,7 @@ const PmocLabelPage: React.FC = () => {
                                 </div>
                             </div>
                             <div className="col-span-1 flex flex-col items-center justify-center p-4 bg-gray-100 rounded-lg">
-                                <qrcode.QRCodeSVG value={equipmentUrl} size={160} />
+                                <QRCodeSVG value={equipmentUrl} size={160} />
                                 <p className="text-center text-xs text-gray-600 mt-3 font-semibold">
                                     Aponte a câmera para acessar o histórico completo do equipamento.
                                 </p>

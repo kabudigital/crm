@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { ChevronLeft, LoaderCircle, FileSignature, Building, Calendar, RefreshCw, Wrench, CheckCircle, XCircle, FileClock } from 'lucide-react';
 import { Contract, ServiceOrder, ContractStatus, ServiceOrderStatus, ServiceType, Equipment } from '../types';
 import { supabase } from '../lib/supabaseClient';
-import * as qrcode from 'qrcode.react';
+import { QRCodeSVG } from 'qrcode.react';
 
 const getStatusInfo = (status: ContractStatus) => {
     switch (status) {
@@ -127,7 +127,7 @@ const ContractDetailPage: React.FC = () => {
                 <h2 className="text-xl font-bold text-brand-dark mb-4 flex items-center"><Wrench size={20} className="mr-2"/> Equipamentos Cobertos</h2>
                  <ul className="space-y-3">
                    {equipments.map(eq => {
-                       const equipmentHistoryUrl = `${window.location.origin}/#/equipment/${eq.id}/pmoc-history`;
+                       const equipmentHistoryUrl = `${window.location.origin}/equipment/${eq.id}/pmoc-history`;
                        return (
                          <li key={eq.id} className="p-3 bg-gray-50 rounded-md flex justify-between items-center">
                            <div>
@@ -135,7 +135,7 @@ const ContractDetailPage: React.FC = () => {
                                <p className="text-xs text-gray-500">{eq.brand} {eq.model} (S/N: {eq.serial_number})</p>
                            </div>
                            <Link to={`/equipment/${eq.id}/pmoc-history`} title="Ver Histórico de Manutenção PMOC">
-                               <qrcode.QRCodeSVG value={equipmentHistoryUrl} size={64} />
+                               <QRCodeSVG value={equipmentHistoryUrl} size={64} />
                            </Link>
                          </li>
                        )

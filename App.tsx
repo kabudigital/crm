@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { HashRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import DashboardPage from './pages/DashboardPage';
 import ServiceOrdersPage from './pages/ServiceOrdersPage';
 import ServiceOrderDetailPage from './pages/ServiceOrderDetailPage';
@@ -89,7 +89,7 @@ const App: React.FC = () => {
   const isAdmin = userProfile.role === UserRole.Admin || userProfile.role === UserRole.Supervisor;
 
   return (
-    <HashRouter>
+    <BrowserRouter>
       <Routes>
         {isAdmin ? (
           <Route element={<AdminLayout user={userProfile} onLogout={handleLogout} />}>
@@ -122,7 +122,7 @@ const App: React.FC = () => {
           </Route>
         )}
       </Routes>
-    </HashRouter>
+    </BrowserRouter>
   );
 };
 

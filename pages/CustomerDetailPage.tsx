@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ChevronLeft, Mail, Phone, MapPin, Plus, LoaderCircle } from 'lucide-react';
-import { Customer, ServiceOrder, ServiceOrderStatus } from '../types';
-import { mockCustomers, getFullServiceOrders } from '../data/mockData';
+import { ChevronLeft, Mail, Phone, MapPin, Plus, LoaderCircle, Wrench } from 'lucide-react';
+import { Customer, ServiceOrder, ServiceOrderStatus, Equipment } from '../types';
+import { supabase } from '../lib/supabaseClient';
 
 const statusText: { [key in ServiceOrderStatus]: string } = {
     [ServiceOrderStatus.AguardandoAgendamento]: 'Aguardando Agendamento',
@@ -11,6 +11,7 @@ const statusText: { [key in ServiceOrderStatus]: string } = {
     [ServiceOrderStatus.AguardandoPeca]: 'Aguardando Peça',
     [ServiceOrderStatus.Concluida]: 'Concluída',
     [ServiceOrderStatus.Cancelada]: 'Cancelada',
+    [ServiceOrderStatus.Aprovado]: 'Aprovado',
 };
 
 const getStatusClass = (status: ServiceOrderStatus) => {
@@ -21,6 +22,7 @@ const getStatusClass = (status: ServiceOrderStatus) => {
         case ServiceOrderStatus.AguardandoPeca: return 'bg-orange-100 text-orange-800';
         case ServiceOrderStatus.Concluida: return 'bg-green-100 text-green-800';
         case ServiceOrderStatus.Cancelada: return 'bg-red-100 text-red-800';
+        case ServiceOrderStatus.Aprovado: return 'bg-purple-100 text-purple-800';
         default: return 'bg-gray-100 text-gray-800';
     }
 };
@@ -29,25 +31,42 @@ const CustomerDetailPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const [customer, setCustomer] = useState<Customer | null>(null);
     const [serviceOrders, setServiceOrders] = useState<ServiceOrder[]>([]);
+    const [equipments, setEquipments] = useState<Equipment[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const fetchCustomerData = () => {
+        const fetchCustomerData = async () => {
             if (!id) return;
             setLoading(true);
 
-            // MOCK LOGIC
-            setTimeout(() => {
-                const customerId = parseInt(id, 10);
-                const foundCustomer = mockCustomers.find(c => c.id === customerId);
-                const customerOrders = getFullServiceOrders()
-                    .filter(so => so.customer_id === customerId)
-                    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+            const customerId = parseInt(id, 10);
+            
+            const { data: customerData, error: customerError } = await supabase
+                .from('customers')
+                .select('*')
+                .eq('id', customerId)
+                .single();
 
-                setCustomer(foundCustomer || null);
-                setServiceOrders(customerOrders as ServiceOrder[]);
-                setLoading(false);
-            }, 300);
+            const { data: ordersData, error: ordersError } = await supabase
+                .from('service_orders')
+                .select('*')
+                .eq('customer_id', customerId)
+                .order('created_at', { ascending: false });
+
+            const { data: equipmentsData, error: equipmentsError } = await supabase
+                .from('equipments')
+                .select('*')
+                .eq('customer_id', customerId);
+            
+            if (customerError || ordersError || equipmentsError) {
+                console.error('Error fetching customer data:', customerError, ordersError, equipmentsError);
+            } else {
+                setCustomer(customerData);
+                setServiceOrders(ordersData as ServiceOrder[]);
+                setEquipments(equipmentsData);
+            }
+
+            setLoading(false);
         };
         fetchCustomerData();
     }, [id]);
@@ -107,6 +126,43 @@ const CustomerDetailPage: React.FC = () => {
                     </div>
                 </div>
             </div>
+
+            <div className="bg-white p-6 rounded-xl shadow-md">
+                 <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-bold text-brand-dark flex items-center"><Wrench size={20} className="mr-2"/> Equipamentos</h2>
+                     <button className="flex items-center gap-2 px-4 py-2 border rounded-lg text-sm hover:bg-gray-100">
+                        <Plus size={16}/>Adicionar Equipamento
+                    </button>
+                </div>
+                 <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                            <tr>
+                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome / Descrição</th>
+                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Marca / Modelo</th>
+                                <th scope="col" className="relative px-6 py-3"><span className="sr-only">Ver</span></th>
+                            </tr>
+                        </thead>
+                         <tbody className="bg-white divide-y divide-gray-200">
+                             {equipments.map(eq => (
+                                <tr key={eq.id}>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{eq.name}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{eq.brand} / {eq.model}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <Link to={`/equipment/${eq.id}`} className="text-brand-primary hover:underline">Ver Histórico</Link>
+                                    </td>
+                                </tr>
+                            ))}
+                            {equipments.length === 0 && (
+                                <tr>
+                                    <td colSpan={3} className="text-center py-4 text-gray-500">Nenhum equipamento cadastrado.</td>
+                                </tr>
+                            )}
+                         </tbody>
+                    </table>
+                </div>
+            </div>
+
 
             <div className="bg-white p-6 rounded-xl shadow-md">
                  <div className="flex justify-between items-center mb-4">

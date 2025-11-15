@@ -4,7 +4,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 import StatCard from '../components/StatCard';
 import { Link } from 'react-router-dom';
 import { ServiceOrder, ServiceOrderStatus, Customer, User, UserRole } from '../types';
-import { getFullServiceOrders, mockCustomers, mockUsers } from '../data/mockData';
+import { supabase } from '../lib/supabaseClient';
 
 const serviceData = [
     { month: 'Jan', count: 12 },
@@ -23,20 +23,31 @@ const DashboardPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const fetchData = () => {
+        const fetchData = async () => {
             setLoading(true);
             
-            // MOCK DATA
-            const allServiceOrders = getFullServiceOrders();
-            const allCustomers = mockCustomers;
-            const allUsers = mockUsers;
+            const { data: ordersData, error: ordersError } = await supabase
+                .from('service_orders')
+                .select(`*, customers (*), users (*), equipments (*)`);
 
-            setServiceOrders(allServiceOrders as ServiceOrder[]);
-            setCustomers(allCustomers);
-            setUsers(allUsers);
-            setTechnicians(allUsers.filter(u => u.role === UserRole.Technician));
+            const { data: customersData, error: customersError } = await supabase
+                .from('customers')
+                .select('*');
+
+            const { data: usersData, error: usersError } = await supabase
+                .from('users')
+                .select('*');
+
+            if (ordersError || customersError || usersError) {
+                console.error('Error fetching data:', ordersError, customersError, usersError);
+            } else {
+                setServiceOrders(ordersData as ServiceOrder[]);
+                setCustomers(customersData);
+                setUsers(usersData);
+                setTechnicians(usersData.filter(u => u.role === UserRole.Technician));
+            }
             
-            setTimeout(() => setLoading(false), 500); // Simulate loading
+            setLoading(false);
         };
 
         fetchData();

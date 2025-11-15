@@ -12,6 +12,7 @@ const statusText: { [key in ServiceOrderStatus]: string } = {
     [ServiceOrderStatus.AguardandoPeca]: 'Aguardando Peça',
     [ServiceOrderStatus.Concluida]: 'Concluída',
     [ServiceOrderStatus.Cancelada]: 'Cancelada',
+    [ServiceOrderStatus.Aprovado]: 'Aprovado',
 };
 
 const getStatusClass = (status: ServiceOrderStatus) => {
@@ -20,47 +21,45 @@ const getStatusClass = (status: ServiceOrderStatus) => {
         case ServiceOrderStatus.Agendada: return 'border-l-4 border-cyan-500';
         case ServiceOrderStatus.EmExecucao: return 'border-l-4 border-yellow-500';
         case ServiceOrderStatus.AguardandoPeca: return 'border-l-4 border-orange-500';
+        case ServiceOrderStatus.Aprovado: return 'border-l-4 border-purple-500';
         default: return 'border-l-4 border-gray-400';
     }
 };
 
 const TechnicianDashboardPage: React.FC = () => {
-  const context = useOutletContext<{ technician: User }>();
-  const technician = context?.technician;
+  const technician = useOutletContext<User | null>();
+  
   const [assignedOrders, setAssignedOrders] = useState<ServiceOrder[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!technician) {
-      setLoading(false);
-      return;
+    if (!technician?.id) {
+        setLoading(false);
+        return;
     }
 
-    const fetchAssignedOrders = () => {
-        setLoading(true);
+    setLoading(true);
+    // MOCK LOGIC
+    setTimeout(() => {
+        const allOrders = getFullServiceOrders();
+        const techOrders = allOrders.filter(o => 
+            o.technician_id === technician.id &&
+            o.status !== ServiceOrderStatus.Concluida &&
+            o.status !== ServiceOrderStatus.Cancelada
+        ).sort((a,b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
-        // MOCK LOGIC
-        setTimeout(() => {
-            const allOrders = getFullServiceOrders();
-            const techOrders = allOrders.filter(o => 
-                o.technician_id === technician.id &&
-                o.status !== ServiceOrderStatus.Concluida &&
-                o.status !== ServiceOrderStatus.Cancelada
-            ).sort((a,b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-
-            setAssignedOrders(techOrders as ServiceOrder[]);
-            setLoading(false);
-        }, 300);
-    };
-
-    fetchAssignedOrders();
+        setAssignedOrders(techOrders as ServiceOrder[]);
+        setLoading(false);
+    }, 300);
   }, [technician]);
   
-  if (!technician && !loading) {
+  if (!technician?.id) {
     return (
-        <div className="text-center p-10">
-            <h1 className="text-xl font-bold text-red-500">Erro ao carregar dados do técnico.</h1>
-            <p className="text-gray-600">Por favor, tente fazer login novamente.</p>
+        <div className="flex justify-center items-center h-full">
+            <div className="text-center p-10 bg-white rounded-lg shadow-md">
+                <h1 className="text-xl font-bold text-red-500">Erro ao Carregar Dados</h1>
+                <p className="text-gray-600 mt-2">Não foi possível identificar o usuário. Por favor, tente fazer o login novamente.</p>
+            </div>
         </div>
     );
   }

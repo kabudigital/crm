@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, Plus, Building, Mail, Phone, LoaderCircle } from 'lucide-react';
 import { Customer } from '../types';
-import { mockCustomers } from '../data/mockData';
+import { supabase } from '../lib/supabaseClient';
 
 const CustomerCard: React.FC<{ customer: Customer }> = ({ customer }) => {
     return (
@@ -40,22 +40,26 @@ const CustomersPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
 
-    const fetchCustomers = useCallback(() => {
+    const fetchCustomers = useCallback(async () => {
         setLoading(true);
         
-        // MOCK LOGIC
-        setTimeout(() => {
-            let filteredCustomers = mockCustomers;
+        let query = supabase
+            .from('customers')
+            .select('*')
+            .order('name', { ascending: true });
 
-            if (searchTerm) {
-                filteredCustomers = mockCustomers.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()));
-            }
-            
-            filteredCustomers.sort((a, b) => a.name.localeCompare(b.name));
-            
-            setCustomers(filteredCustomers);
-            setLoading(false);
-        }, 300);
+        if (searchTerm) {
+            query = query.ilike('name', `%${searchTerm}%`);
+        }
+        
+        const { data, error } = await query;
+        
+        if (error) {
+            console.error('Error fetching customers:', error);
+        } else {
+            setCustomers(data);
+        }
+        setLoading(false);
     }, [searchTerm]);
 
     useEffect(() => {

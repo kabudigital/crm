@@ -16,7 +16,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ user, onLogout }) => {
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 p-4 md:p-6 lg:p-8">
-          <Outlet />
+          <Outlet context={user} />
         </main>
       </div>
     </div>

@@ -1,10 +1,10 @@
-import { User, Customer, ServiceOrder, UserRole, ServiceOrderStatus, ServiceType, Equipment } from '../types';
+import { User, Customer, ServiceOrder, UserRole, ServiceOrderStatus, ServiceType, Equipment, Campaign, CampaignStatus, Contract, ContractStatus } from '../types';
 
 export const mockUsers: User[] = [
   { id: 1, name: 'Alice Admin', email: 'admin@demo.com', role: UserRole.Admin, password: 'password' },
   { id: 2, name: 'Bob Supervisor', email: 'supervisor@demo.com', role: UserRole.Supervisor, password: 'password' },
-  { id: 3, name: 'Charlie Técnico', email: 'tech@demo.com', role: UserRole.Technician, phone: '(11) 98765-4321', password: 'password' },
-  { id: 4, name: 'Diana Técnica', email: 'diana@demo.com', role: UserRole.Technician, phone: '(21) 91234-5678', password: 'password' },
+  { id: 3, name: 'Charlie Técnico', email: 'tech@demo.com', role: UserRole.Technician, phone: '5511987654321', password: 'password' },
+  { id: 4, name: 'Diana Técnica', email: 'diana@demo.com', role: UserRole.Technician, phone: '5521912345678', password: 'password' },
 ];
 
 export const mockCustomers: Customer[] = [
@@ -14,10 +14,33 @@ export const mockCustomers: Customer[] = [
 ];
 
 export const mockEquipments: Equipment[] = [
-    { id: 1, customer_id: 1, name: 'Ar Condicionado Central - Praça de Alimentação', brand: 'Carrier', model: 'X-1000', serial_number: 'SN12345' },
-    { id: 2, customer_id: 2, name: 'Split Corredor Bloco A', brand: 'LG', model: 'Dual Inverter', serial_number: 'SN67890' },
+    { id: 1, customer_id: 1, name: 'Ar Condicionado Central - Praça de Alimentação', brand: 'Carrier', model: 'X-1000', serial_number: 'SN12345', capacity_btu: 120000 },
+    { id: 2, customer_id: 2, name: 'Split Corredor Bloco A', brand: 'LG', model: 'Dual Inverter', serial_number: 'SN67890', capacity_btu: 18000 },
     { id: 3, customer_id: 3, name: 'Refrigerador Balcão', brand: 'Metalfrio', model: 'VB40', serial_number: 'SN54321' },
-    { id: 4, customer_id: 1, name: 'Split Loja C&A', brand: 'Daikin', model: 'Eco-Plus', serial_number: 'SN09876' }
+    { id: 4, customer_id: 1, name: 'Split Loja C&A', brand: 'Daikin', model: 'Eco-Plus', serial_number: 'SN09876', capacity_btu: 24000 }
+];
+
+export const mockContracts: Contract[] = [
+    {
+        id: 1,
+        name: 'Contrato PMOC 2024 - Shopping Norte',
+        customer_id: 1,
+        status: ContractStatus.Ativo,
+        start_date: '2024-01-01',
+        end_date: '2024-12-31',
+        frequency: 'mensal',
+        equipment_ids: [1, 4]
+    },
+    {
+        id: 2,
+        name: 'Manutenção Preventiva Ed. Copan',
+        customer_id: 2,
+        status: ContractStatus.Ativo,
+        start_date: '2024-03-01',
+        end_date: '2025-02-28',
+        frequency: 'bimestral',
+        equipment_ids: [2]
+    },
 ];
 
 export const mockServiceOrders: ServiceOrder[] = [
@@ -27,17 +50,21 @@ export const mockServiceOrders: ServiceOrder[] = [
     equipment_id: 1,
     technician_id: 3,
     reported_problem: 'Ar condicionado da praça de alimentação não está gelando o suficiente.', 
+    service_description: 'Verificar pressão do gás e limpar serpentina.',
     service_type: ServiceType.Corretiva, 
     status: ServiceOrderStatus.EmExecucao, 
     created_at: '2024-07-29T10:00:00Z',
     scheduled_at: '2024-07-29T14:00:00Z',
+    geolocation: 'https://maps.app.goo.gl/abcdef123456'
   },
   { 
     id: 102, 
     customer_id: 2,
     equipment_id: 2,
     technician_id: 4,
+    contract_id: 2,
     reported_problem: 'Manutenção preventiva mensal nos splits do Bloco A.', 
+    service_description: 'Limpeza de filtros, verificação de drenos e medição de corrente.',
     service_type: ServiceType.Preventiva, 
     status: ServiceOrderStatus.Agendada, 
     created_at: '2024-07-28T15:30:00Z',
@@ -48,11 +75,13 @@ export const mockServiceOrders: ServiceOrder[] = [
     customer_id: 3,
     equipment_id: 3,
     technician_id: 3,
-    reported_problem: 'Refrigerador do balcão fazendo barulho estranho.', 
+    reported_problem: 'Refrigerador do balcão fazendo barulho estranho.',
+    service_description: 'Diagnóstico de ruído no motor do compressor.',
+    observations: 'Cliente relata que o barulho é mais alto no período da tarde.',
     service_type: ServiceType.Corretiva, 
     status: ServiceOrderStatus.AguardandoPeca, 
     created_at: '2024-07-27T09:15:00Z',
-    required_materials: ['Compressor Embraco EM200', 'Gás R134a'],
+    required_materials: [{ name: 'Compressor Embraco EM200', quantity: 1 }, { name: 'Gás R134a', quantity: 1 }],
   },
   { 
     id: 104, 
@@ -69,11 +98,15 @@ export const mockServiceOrders: ServiceOrder[] = [
     customer_id: 2,
     equipment_id: 2,
     technician_id: 4,
+    contract_id: 2,
     reported_problem: 'Troca de filtro de ar do split do 5º andar.', 
     service_type: ServiceType.Preventiva, 
     status: ServiceOrderStatus.Concluida, 
     created_at: '2024-07-20T11:00:00Z',
     completed_at: '2024-07-22T14:30:00Z',
+    technical_report: 'Filtro de ar do equipamento foi substituído por um novo modelo G3. Sistema operando normalmente. Pressão e temperatura de acordo com o especificado pelo fabricante.',
+    completed_by_customer: 'Sr. Roberto (zelador)',
+    photos_urls: ['/placeholder/antes.jpg', '/placeholder/depois.jpg'],
   },
   { 
     id: 106, 
@@ -87,6 +120,19 @@ export const mockServiceOrders: ServiceOrder[] = [
   }
 ];
 
+export const mockCampaigns: Campaign[] = [
+    {
+        id: 1,
+        name: 'Promoção de Verão',
+        message: 'Aproveite o verão com o ar condicionado em dia! Agende sua limpeza preventiva com 20% de desconto.',
+        target: 'all',
+        scheduledAt: '2024-08-15T10:00:00Z',
+        status: CampaignStatus.Enviada,
+        createdAt: '2024-08-01T11:00:00Z'
+    }
+];
+
+
 // Helper to "join" data like Supabase would
 export const getFullServiceOrders = () => {
     return mockServiceOrders.map(so => ({
@@ -95,4 +141,12 @@ export const getFullServiceOrders = () => {
         users: mockUsers.find(u => u.id === so.technician_id),
         equipments: mockEquipments.find(e => e.id === so.equipment_id),
     })) as (ServiceOrder & { customers?: Customer, users?: User, equipments?: Equipment })[];
+};
+
+export const getFullContracts = () => {
+    return mockContracts.map(contract => ({
+        ...contract,
+        customers: mockCustomers.find(c => c.id === contract.customer_id),
+        equipments: mockEquipments.filter(e => contract.equipment_ids.includes(e.id)),
+    })) as (Contract & { customers?: Customer, equipments?: Equipment[] })[];
 };

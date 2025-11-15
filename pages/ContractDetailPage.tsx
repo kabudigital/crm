@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { ChevronLeft, LoaderCircle, FileSignature, Building, Calendar, RefreshCw, Wrench, CheckCircle, XCircle, FileClock } from 'lucide-react';
 import { Contract, ServiceOrder, ContractStatus, ServiceOrderStatus, ServiceType, Equipment } from '../types';
 import { supabase } from '../lib/supabaseClient';
-import QRCode from 'qrcode.react';
+import * as qrcode from 'qrcode.react';
 
 const getStatusInfo = (status: ContractStatus) => {
     switch (status) {
@@ -135,7 +135,7 @@ const ContractDetailPage: React.FC = () => {
                                <p className="text-xs text-gray-500">{eq.brand} {eq.model} (S/N: {eq.serial_number})</p>
                            </div>
                            <Link to={`/equipment/${eq.id}/pmoc-history`} title="Ver Histórico de Manutenção PMOC">
-                               <QRCode value={equipmentHistoryUrl} size={64} renderAs="svg" />
+                               <qrcode.QRCodeSVG value={equipmentHistoryUrl} size={64} />
                            </Link>
                          </li>
                        )

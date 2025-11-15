@@ -5,20 +5,30 @@ import TimeClock from '../components/TimeClock';
 import { supabase } from '../lib/supabaseClient';
 import { LoaderCircle } from 'lucide-react';
 
+const statusText: { [key in ServiceOrderStatus]: string } = {
+    [ServiceOrderStatus.AguardandoAgendamento]: 'Aguardando Agendamento',
+    [ServiceOrderStatus.Agendada]: 'Agendada',
+    [ServiceOrderStatus.EmExecucao]: 'Em Execução',
+    [ServiceOrderStatus.AguardandoPeca]: 'Aguardando Peça',
+    [ServiceOrderStatus.Concluida]: 'Concluída',
+    [ServiceOrderStatus.Cancelada]: 'Cancelada',
+};
+
+const getStatusClass = (status: ServiceOrderStatus) => {
+    switch (status) {
+        case ServiceOrderStatus.AguardandoAgendamento: return 'border-l-4 border-blue-500';
+        case ServiceOrderStatus.Agendada: return 'border-l-4 border-cyan-500';
+        case ServiceOrderStatus.EmExecucao: return 'border-l-4 border-yellow-500';
+        case ServiceOrderStatus.AguardandoPeca: return 'border-l-4 border-orange-500';
+        default: return 'border-l-4 border-gray-400';
+    }
+};
+
+// FIX: Defined props interface for TechnicianDashboardPage component.
 interface TechnicianDashboardPageProps {
   technician: User;
   onLogout: () => void;
 }
-
-const getStatusClass = (status: ServiceOrder['status']) => {
-    switch (status) {
-        case ServiceOrderStatus.Open: return 'border-l-4 border-blue-500';
-        case ServiceOrderStatus.InProgress: return 'border-l-4 border-yellow-500';
-        case ServiceOrderStatus.Completed: return 'border-l-4 border-green-500';
-        case ServiceOrderStatus.Canceled: return 'border-l-4 border-red-500';
-        default: return 'border-l-4 border-gray-400';
-    }
-};
 
 const TechnicianDashboardPage: React.FC<TechnicianDashboardPageProps> = ({ technician, onLogout }) => {
   const [assignedOrders, setAssignedOrders] = useState<ServiceOrder[]>([]);
@@ -31,12 +41,12 @@ const TechnicianDashboardPage: React.FC<TechnicianDashboardPageProps> = ({ techn
             .from('service_orders')
             .select('*, customers(name)')
             .eq('technician_id', technician.id)
-            .neq('status', ServiceOrderStatus.Completed)
-            .neq('status', ServiceOrderStatus.Canceled)
+            .neq('status', ServiceOrderStatus.Concluida)
+            .neq('status', ServiceOrderStatus.Cancelada)
             .order('created_at', { ascending: true });
 
         if (data) {
-            setAssignedOrders(data);
+            setAssignedOrders(data as ServiceOrder[]);
         }
         setLoading(false);
     };
@@ -63,12 +73,11 @@ const TechnicianDashboardPage: React.FC<TechnicianDashboardPageProps> = ({ techn
                            <li key={order.id} className={`bg-white p-4 rounded-lg shadow-sm hover:shadow-md transition-shadow ${getStatusClass(order.status)}`}>
                                <div className="flex justify-between items-start">
                                    <div>
-                                       <p className="font-bold text-brand-dark">{order.title}</p>
+                                       <p className="font-bold text-brand-dark">{order.reported_problem}</p>
                                        <p className="text-sm text-gray-600">{order.customers?.name}</p>
                                    </div>
-                                   <span className="text-xs font-semibold capitalize px-2 py-1 bg-gray-200 text-gray-800 rounded-full">{order.status.replace('_', ' ')}</span>
+                                   <span className="text-xs font-semibold capitalize px-2 py-1 bg-gray-200 text-gray-800 rounded-full">{statusText[order.status]}</span>
                                </div>
-                               <p className="mt-2 text-sm text-gray-500">{order.description}</p>
                                <p className="text-right text-xs text-gray-400 mt-2">
                                    Aberta em: {new Date(order.created_at).toLocaleDateString()}
                                </p>

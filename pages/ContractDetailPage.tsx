@@ -1,21 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ChevronLeft, User, Building, Calendar, CheckCircle, XCircle, LoaderCircle } from 'lucide-react';
-import { ServiceOrder, ServiceOrderStatus } from '../types';
+import { ChevronLeft, User, Building, Calendar, CheckCircle, XCircle, LoaderCircle, Wrench, Package, List, Clock } from 'lucide-react';
+import { ServiceOrder, ServiceOrderStatus, ServiceType } from '../types';
 import { supabase } from '../lib/supabaseClient';
+
+const statusText: { [key in ServiceOrderStatus]: string } = {
+    [ServiceOrderStatus.AguardandoAgendamento]: 'Aguardando Agendamento',
+    [ServiceOrderStatus.Agendada]: 'Agendada',
+    [ServiceOrderStatus.EmExecucao]: 'Em Execução',
+    [ServiceOrderStatus.AguardandoPeca]: 'Aguardando Peça',
+    [ServiceOrderStatus.Concluida]: 'Concluída',
+    [ServiceOrderStatus.Cancelada]: 'Cancelada',
+};
 
 const getStatusInfo = (status: ServiceOrderStatus) => {
     switch (status) {
-        case ServiceOrderStatus.Open:
-            return { text: 'Aberta', color: 'text-blue-600', bg: 'bg-blue-100' };
-        case ServiceOrderStatus.InProgress:
-            return { text: 'Em Andamento', color: 'text-yellow-600', bg: 'bg-yellow-100' };
-        case ServiceOrderStatus.Completed:
-            return { text: 'Concluída', color: 'text-green-600', bg: 'bg-green-100' };
-        case ServiceOrderStatus.Canceled:
-            return { text: 'Cancelada', color: 'text-red-600', bg: 'bg-red-100' };
-        default:
-            return { text: 'Desconhecido', color: 'text-gray-600', bg: 'bg-gray-100' };
+        case ServiceOrderStatus.AguardandoAgendamento: return { text: statusText[status], color: 'text-blue-600', bg: 'bg-blue-100' };
+        case ServiceOrderStatus.Agendada: return { text: statusText[status], color: 'text-cyan-600', bg: 'bg-cyan-100' };
+        case ServiceOrderStatus.EmExecucao: return { text: statusText[status], color: 'text-yellow-600', bg: 'bg-yellow-100' };
+        case ServiceOrderStatus.AguardandoPeca: return { text: statusText[status], color: 'text-orange-600', bg: 'bg-orange-100' };
+        case ServiceOrderStatus.Concluida: return { text: statusText[status], color: 'text-green-600', bg: 'bg-green-100' };
+        case ServiceOrderStatus.Cancelada: return { text: statusText[status], color: 'text-red-600', bg: 'bg-red-100' };
+        default: return { text: 'Desconhecido', color: 'text-gray-600', bg: 'bg-gray-100' };
     }
 };
 
@@ -30,12 +36,12 @@ const ServiceOrderDetailPage: React.FC = () => {
             setLoading(true);
             const { data, error } = await supabase
                 .from('service_orders')
-                .select('*, customers(*), users(*)')
+                .select('*, customers(*), users(*), equipments(*)')
                 .eq('id', id)
                 .single();
             
             if (data) {
-                setOrder(data);
+                setOrder(data as ServiceOrder);
             }
             setLoading(false);
         };
@@ -71,7 +77,7 @@ const ServiceOrderDetailPage: React.FC = () => {
                         <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold ${statusInfo.bg} ${statusInfo.color}`}>
                             {statusInfo.text}
                         </span>
-                        <h1 className="text-3xl font-bold text-brand-dark mt-2">{order.title}</h1>
+                        <h1 className="text-3xl font-bold text-brand-dark mt-2">{order.reported_problem}</h1>
                         <p className="text-lg text-gray-500">OS #{order.id}</p>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0 mt-4 md:mt-0">
@@ -84,12 +90,18 @@ const ServiceOrderDetailPage: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 space-y-6">
                     <div className="bg-white p-6 rounded-xl shadow-md">
-                        <h2 className="text-xl font-bold text-brand-dark mb-4">Descrição do Serviço</h2>
-                        <p className="text-gray-700 whitespace-pre-wrap">{order.description}</p>
+                        <h2 className="text-xl font-bold text-brand-dark mb-4">Problema Relatado</h2>
+                        <p className="text-gray-700 whitespace-pre-wrap">{order.reported_problem}</p>
                     </div>
                      <div className="bg-white p-6 rounded-xl shadow-md">
-                        <h2 className="text-xl font-bold text-brand-dark mb-4">Histórico e Atividades</h2>
-                        <p className="text-gray-500">Nenhuma atividade registrada ainda.</p>
+                        <h2 className="text-xl font-bold text-brand-dark mb-4">Materiais Necessários</h2>
+                        {order.required_materials && order.required_materials.length > 0 ? (
+                             <ul className="list-disc list-inside space-y-1 text-gray-700">
+                                {order.required_materials.map((item, index) => <li key={index}>{item}</li>)}
+                            </ul>
+                        ) : (
+                             <p className="text-gray-500">Nenhum material listado.</p>
+                        )}
                     </div>
                 </div>
 
@@ -105,10 +117,31 @@ const ServiceOrderDetailPage: React.FC = () => {
                                 </div>
                             </li>
                             <li className="flex items-center">
+                                <Wrench size={18} className="text-gray-500 mr-3"/>
+                                <div>
+                                    <span className="text-gray-500">Equipamento</span>
+                                    <p className="font-semibold text-gray-800">{order.equipments?.name || 'Não especificado'}</p>
+                                </div>
+                            </li>
+                            <li className="flex items-center">
                                 <User size={18} className="text-gray-500 mr-3"/>
                                 <div>
                                     <span className="text-gray-500">Técnico</span>
                                     <p className="font-semibold text-gray-800">{order.users?.name || 'Não atribuído'}</p>
+                                </div>
+                            </li>
+                            <li className="flex items-center">
+                                <List size={18} className="text-gray-500 mr-3"/>
+                                <div>
+                                    <span className="text-gray-500">Tipo de Serviço</span>
+                                    <p className="font-semibold text-gray-800 capitalize">{order.service_type}</p>
+                                </div>
+                            </li>
+                             <li className="flex items-center">
+                                <Clock size={18} className="text-gray-500 mr-3"/>
+                                <div>
+                                    <span className="text-gray-500">Agendado Para</span>
+                                    <p className="font-semibold text-gray-800">{order.scheduled_at ? new Date(order.scheduled_at).toLocaleString() : 'Não agendado'}</p>
                                 </div>
                             </li>
                             <li className="flex items-center">
@@ -127,7 +160,7 @@ const ServiceOrderDetailPage: React.FC = () => {
                                     </div>
                                 </li>
                             )}
-                             {order.status === ServiceOrderStatus.Canceled && (
+                             {order.status === ServiceOrderStatus.Cancelada && (
                                <li className="flex items-center">
                                     <XCircle size={18} className="text-red-500 mr-3"/>
                                     <div>

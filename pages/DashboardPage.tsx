@@ -31,7 +31,7 @@ const DashboardPage: React.FC = () => {
             const { data: customerData, error: customerError } = await supabase.from('customers').select('*');
             const { data: userData, error: userError } = await supabase.from('users').select('*');
 
-            if (soData) setServiceOrders(soData);
+            if (soData) setServiceOrders(soData as ServiceOrder[]);
             if (customerData) setCustomers(customerData);
             if (userData) {
                 setUsers(userData);
@@ -47,9 +47,10 @@ const DashboardPage: React.FC = () => {
         return <div className="flex justify-center items-center h-full"><LoaderCircle className="animate-spin h-12 w-12 text-brand-primary" /></div>;
     }
 
-    const openOrders = serviceOrders.filter(so => so.status === 'aberta').length;
+    const openOrders = serviceOrders.filter(so => so.status !== ServiceOrderStatus.Concluida && so.status !== ServiceOrderStatus.Cancelada).length;
     const upcomingServiceOrders = serviceOrders
-      .filter(so => so.status === ServiceOrderStatus.Open)
+      .filter(so => so.status !== ServiceOrderStatus.Concluida && so.status !== ServiceOrderStatus.Cancelada)
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
       .slice(0, 3);
       
     return (
@@ -82,7 +83,7 @@ const DashboardPage: React.FC = () => {
                     <ul className="space-y-4">
                         {upcomingServiceOrders.map(so => (
                            <li key={so.id} className="p-3 bg-gray-50 rounded-lg">
-                               <p className="font-semibold text-brand-dark">{so.title}</p>
+                               <p className="font-semibold text-brand-dark line-clamp-2">{so.reported_problem}</p>
                                <p className="text-sm text-gray-500">{so.customers?.name}</p>
                                <p className="text-sm text-gray-500">Aberta em: {new Date(so.created_at).toLocaleDateString()}</p>
                            </li>

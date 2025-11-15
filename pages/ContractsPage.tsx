@@ -4,38 +4,42 @@ import { Search, Plus, SlidersHorizontal, LoaderCircle } from 'lucide-react';
 import { ServiceOrder, ServiceOrderStatus } from '../types';
 import { supabase } from '../lib/supabaseClient';
 
-const getStatusClass = (status: ServiceOrder['status']) => {
+const getStatusClass = (status: ServiceOrderStatus) => {
     switch (status) {
-        case ServiceOrderStatus.Open: return 'bg-blue-100 text-blue-800';
-        case ServiceOrderStatus.InProgress: return 'bg-yellow-100 text-yellow-800';
-        case ServiceOrderStatus.Completed: return 'bg-green-100 text-green-800';
-        case ServiceOrderStatus.Canceled: return 'bg-red-100 text-red-800';
+        case ServiceOrderStatus.AguardandoAgendamento: return 'bg-blue-100 text-blue-800';
+        case ServiceOrderStatus.Agendada: return 'bg-cyan-100 text-cyan-800';
+        case ServiceOrderStatus.EmExecucao: return 'bg-yellow-100 text-yellow-800';
+        case ServiceOrderStatus.AguardandoPeca: return 'bg-orange-100 text-orange-800';
+        case ServiceOrderStatus.Concluida: return 'bg-green-100 text-green-800';
+        case ServiceOrderStatus.Cancelada: return 'bg-red-100 text-red-800';
         default: return 'bg-gray-100 text-gray-800';
     }
 };
 
 const statusText: { [key in ServiceOrderStatus]: string } = {
-    [ServiceOrderStatus.Open]: 'Aberta',
-    [ServiceOrderStatus.InProgress]: 'Em Andamento',
-    [ServiceOrderStatus.Completed]: 'Concluída',
-    [ServiceOrderStatus.Canceled]: 'Cancelada',
-}
+    [ServiceOrderStatus.AguardandoAgendamento]: 'Aguardando Agendamento',
+    [ServiceOrderStatus.Agendada]: 'Agendada',
+    [ServiceOrderStatus.EmExecucao]: 'Em Execução',
+    [ServiceOrderStatus.AguardandoPeca]: 'Aguardando Peça',
+    [ServiceOrderStatus.Concluida]: 'Concluída',
+    [ServiceOrderStatus.Cancelada]: 'Cancelada',
+};
+
 
 const ServiceOrderCard: React.FC<{ order: ServiceOrder }> = ({ order }) => {
     return (
         <div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden">
             <div className="p-5">
                 <div className="flex justify-between items-start">
-                    <h3 className="font-bold text-lg text-brand-dark">{order.title}</h3>
-                    <span className={`px-3 py-1 text-xs font-semibold rounded-full ${getStatusClass(order.status)}`}>
+                    <h3 className="font-bold text-lg text-brand-dark line-clamp-2">{order.reported_problem}</h3>
+                    <span className={`text-center flex-shrink-0 px-3 py-1 text-xs font-semibold rounded-full ${getStatusClass(order.status)}`}>
                         {statusText[order.status]}
                     </span>
                 </div>
                 <p className="text-sm text-gray-600 mt-1">{order.customers?.name || 'Cliente não encontrado'}</p>
-                <p className="mt-4 text-sm text-gray-500 line-clamp-2">{order.description}</p>
+                <p className="mt-4 text-sm text-gray-500 line-clamp-2">OS #{order.id} &bull; Criada em {new Date(order.created_at).toLocaleDateString()}</p>
             </div>
             <div className="px-5 py-3 bg-gray-50 border-t flex justify-end items-center space-x-2">
-                <span className="text-xs text-gray-500">OS #{order.id}</span>
                 <Link to={`/service-orders/${order.id}`} className="px-4 py-2 text-sm font-medium text-white bg-brand-primary rounded-lg hover:bg-brand-primary/90">
                     Ver Detalhes
                 </Link>
@@ -59,17 +63,14 @@ const ServiceOrdersPage: React.FC = () => {
         }
         
         if (searchTerm) {
-            // This requires a GIN index on customers.name for performance.
-            // For simplicity here, we'll do a simple text search on the title.
-            // A more complex search might involve an RPC function in Supabase.
-            query = query.ilike('title', `%${searchTerm}%`);
+            query = query.ilike('reported_problem', `%${searchTerm}%`);
         }
         
         query = query.order('created_at', { ascending: false });
 
         const { data, error } = await query;
         if (data) {
-            setOrders(data);
+            setOrders(data as ServiceOrder[]);
         }
         setLoading(false);
     }, [searchTerm, statusFilter]);
@@ -87,7 +88,7 @@ const ServiceOrdersPage: React.FC = () => {
                     </span>
                     <input
                         type="text"
-                        placeholder="Buscar por título..."
+                        placeholder="Buscar por problema relatado..."
                         className="w-full py-2 pl-10 pr-4 border rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-primary"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
@@ -100,10 +101,9 @@ const ServiceOrdersPage: React.FC = () => {
                         onChange={(e) => setStatusFilter(e.target.value)}
                     >
                         <option value="todos">Todos Status</option>
-                        <option value={ServiceOrderStatus.Open}>Aberta</option>
-                        <option value={ServiceOrderStatus.InProgress}>Em Andamento</option>
-                        <option value={ServiceOrderStatus.Completed}>Concluída</option>
-                        <option value={ServiceOrderStatus.Canceled}>Cancelada</option>
+                        {Object.values(ServiceOrderStatus).map(status => (
+                            <option key={status} value={status}>{statusText[status]}</option>
+                        ))}
                     </select>
                     <button className="p-2 border rounded-lg hover:bg-gray-100">
                         <SlidersHorizontal size={20} />

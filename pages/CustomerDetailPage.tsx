@@ -1,8 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ChevronLeft, Mail, Phone, MapPin, Plus, LoaderCircle } from 'lucide-react';
-import { Customer, ServiceOrder } from '../types';
+import { Customer, ServiceOrder, ServiceOrderStatus } from '../types';
 import { supabase } from '../lib/supabaseClient';
+
+const statusText: { [key in ServiceOrderStatus]: string } = {
+    [ServiceOrderStatus.AguardandoAgendamento]: 'Aguardando Agendamento',
+    [ServiceOrderStatus.Agendada]: 'Agendada',
+    [ServiceOrderStatus.EmExecucao]: 'Em Execução',
+    [ServiceOrderStatus.AguardandoPeca]: 'Aguardando Peça',
+    [ServiceOrderStatus.Concluida]: 'Concluída',
+    [ServiceOrderStatus.Cancelada]: 'Cancelada',
+};
+
+const getStatusClass = (status: ServiceOrderStatus) => {
+    switch (status) {
+        case ServiceOrderStatus.AguardandoAgendamento: return 'bg-blue-100 text-blue-800';
+        case ServiceOrderStatus.Agendada: return 'bg-cyan-100 text-cyan-800';
+        case ServiceOrderStatus.EmExecucao: return 'bg-yellow-100 text-yellow-800';
+        case ServiceOrderStatus.AguardandoPeca: return 'bg-orange-100 text-orange-800';
+        case ServiceOrderStatus.Concluida: return 'bg-green-100 text-green-800';
+        case ServiceOrderStatus.Cancelada: return 'bg-red-100 text-red-800';
+        default: return 'bg-gray-100 text-gray-800';
+    }
+};
 
 const CustomerDetailPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -30,7 +51,7 @@ const CustomerDetailPage: React.FC = () => {
                 .order('created_at', { ascending: false });
 
             if (customerData) setCustomer(customerData);
-            if (soData) setServiceOrders(soData);
+            if (soData) setServiceOrders(soData as ServiceOrder[]);
             
             setLoading(false);
         };
@@ -104,7 +125,7 @@ const CustomerDetailPage: React.FC = () => {
                     <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                             <tr>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Título</th>
+                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Problema Relatado</th>
                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data de Abertura</th>
                                 <th scope="col" className="relative px-6 py-3"><span className="sr-only">Ver</span></th>
@@ -113,8 +134,12 @@ const CustomerDetailPage: React.FC = () => {
                         <tbody className="bg-white divide-y divide-gray-200">
                             {serviceOrders.map(so => (
                                 <tr key={so.id}>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{so.title}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{so.status}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{so.reported_problem}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusClass(so.status)}`}>
+                                        {statusText[so.status]}
+                                      </span>
+                                    </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(so.created_at).toLocaleDateString()}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                         <Link to={`/service-orders/${so.id}`} className="text-brand-primary hover:underline">Ver Detalhes</Link>

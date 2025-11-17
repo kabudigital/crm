@@ -24,7 +24,8 @@ const NewCampaignPage: React.FC = () => {
     useEffect(() => {
         const fetchCustomers = async () => {
             setLoading(true);
-            const { data, error } = await supabase.from('customers').select('id, name');
+            // FIX: Select all fields to match the Customer type, which requires `created_at`.
+            const { data, error } = await supabase.from('customers').select('*');
             if (error) {
                 console.error(error);
             } else {

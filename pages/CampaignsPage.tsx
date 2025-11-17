@@ -28,7 +28,8 @@ const CampaignsPage: React.FC = () => {
             
             const { data: customersData, error: customersError } = await supabase
                 .from('customers')
-                .select('id, name');
+                // FIX: Select all fields to match the Customer type, which requires `created_at`.
+                .select('*');
 
             if (campaignsError || customersError) {
                 console.error(campaignsError, customersError);

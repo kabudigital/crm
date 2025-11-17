@@ -44,7 +44,7 @@ const AuthPage: React.FC = () => {
     
     setLoading(true);
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error: signUpError } = await supabase.auth.signUp({
       email: email,
       password: password,
       options: {
@@ -55,16 +55,23 @@ const AuthPage: React.FC = () => {
       }
     });
 
-    setLoading(false);
-    if (error) {
-      if (error instanceof AuthApiError) {
-        setError(error.message);
+    if (signUpError) {
+      setLoading(false);
+      if (signUpError instanceof AuthApiError) {
+        setError(signUpError.message);
       } else {
         setError('Ocorreu um erro inesperado no cadastro.');
       }
-    } else {
-        alert('Cadastro realizado com sucesso! Verifique seu email para confirmação.');
-        setIsLogin(true); // Switch to login view after successful registration
+      return;
+    }
+    
+    // If sign up is successful, onAuthStateChange in App.tsx will be triggered.
+    // A database trigger is assumed to create the user profile from auth metadata.
+    // App.tsx will then find the profile and redirect. We keep loading active
+    // until the redirect causes this component to unmount.
+    if (!data.user) {
+       setLoading(false);
+       setError("Cadastro realizado, mas não foi possível iniciar a sessão automaticamente.");
     }
   };
 

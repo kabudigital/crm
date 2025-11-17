@@ -19,7 +19,10 @@ const NewTechnicianPage: React.FC = () => {
         setError('');
         setIsSubmitting(true);
         
-        const { error } = await supabase.auth.signUp({
+        // Save the current admin session to restore it after creating the new user
+        const { data: { session: adminSession } } = await supabase.auth.getSession();
+
+        const { error: signUpError } = await supabase.auth.signUp({
             email: email,
             password: password,
             options: {
@@ -30,17 +33,41 @@ const NewTechnicianPage: React.FC = () => {
                 }
             }
         });
-
-        setIsSubmitting(false);
-
-        if (error) {
-            if (error instanceof AuthApiError) {
-                setError(error.message);
+        
+        if (signUpError) {
+            setIsSubmitting(false);
+            if (signUpError instanceof AuthApiError) {
+                setError(signUpError.message);
             } else {
                 setError('Ocorreu um erro inesperado no cadastro.');
             }
-        } else {
-            alert('Técnico cadastrado com sucesso! Um email de confirmação foi enviado.');
+            // If there's an error, restore the admin session just in case
+            if (adminSession) {
+                await supabase.auth.setSession({
+                    access_token: adminSession.access_token,
+                    refresh_token: adminSession.refresh_token,
+                });
+            }
+            return;
+        }
+
+        // Restore the admin session
+        if (adminSession) {
+            const { error: setSessionError } = await supabase.auth.setSession({
+                access_token: adminSession.access_token,
+                refresh_token: adminSession.refresh_token,
+            });
+
+            if (setSessionError) {
+                setError("Sessão do administrador perdida. Por favor, faça login novamente.");
+                // Optionally force logout or redirect
+                setTimeout(() => supabase.auth.signOut().then(() => navigate('/')), 2000);
+            }
+        }
+
+        setIsSubmitting(false);
+
+        if (!error) {
             navigate('/technicians');
         }
     };

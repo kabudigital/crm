@@ -43,6 +43,8 @@ const CustomersPage: React.FC = () => {
     const fetchCustomers = useCallback(async () => {
         setLoading(true);
         
+        // 1. Fetch from Supabase
+        let dbCustomers: Customer[] = [];
         let query = supabase
             .from('customers')
             .select('*')
@@ -55,10 +57,46 @@ const CustomersPage: React.FC = () => {
         const { data, error } = await query;
         
         if (error) {
-            console.error('Error fetching customers:', error);
+            console.warn('Error fetching customers (using mock data):', JSON.stringify(error));
+            // Mock Data Fallback if DB fails completely
+            const mockCustomers: Customer[] = [
+                { 
+                    id: 1, 
+                    name: 'Empresa Demo S.A.', 
+                    address: 'Av. Paulista, 1000', 
+                    contact_email: 'contato@demo.com',
+                    contact_phone: '(11) 99999-9999',
+                    created_at: new Date().toISOString() 
+                },
+                { 
+                    id: 2, 
+                    name: 'Comércio Exemplo Ltda', 
+                    address: 'Rua Augusta, 500',
+                    contact_email: 'admin@exemplo.com',
+                    contact_phone: '(11) 98888-8888',
+                    created_at: new Date().toISOString() 
+                }
+            ];
+             dbCustomers = mockCustomers;
         } else {
-            setCustomers(data);
+            dbCustomers = data || [];
         }
+
+        // 2. Fetch from Local Storage (Simulation Mode)
+        const localCustomers = JSON.parse(localStorage.getItem('pmoc_customers') || '[]');
+        
+        // 3. Merge
+        let allCustomers = [...dbCustomers, ...localCustomers];
+
+        // 4. Filter locally if searching (needed for localStorage items or if DB search failed)
+        if (searchTerm) {
+             allCustomers = allCustomers.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()));
+        }
+
+        // Remove duplicates by ID (prefer localStorage as it might be newer in sim mode)
+        const uniqueCustomers = Array.from(new Map(allCustomers.map(item => [item.id, item])).values());
+
+        setCustomers(uniqueCustomers);
         setLoading(false);
     }, [searchTerm]);
 

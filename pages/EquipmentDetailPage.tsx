@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ChevronLeft, Wrench, Building, Hash, Tag, LoaderCircle, Info } from 'lucide-react';
@@ -35,28 +36,56 @@ const EquipmentDetailPage: React.FC = () => {
 
             const equipmentId = parseInt(id, 10);
             
+            let equipmentData: Equipment | null = null;
+
             const { data: eqData, error: eqError } = await supabase
                 .from('equipments')
                 .select('*, customers (*)')
                 .eq('id', equipmentId)
                 .single();
 
-            if (eqError) {
-                console.error("Error fetching equipment", eqError);
+            if (eqData) {
+                equipmentData = eqData as Equipment;
             } else {
-                setEquipment(eqData as Equipment);
+                 // Try Local Storage
+                 const localEquipments = JSON.parse(localStorage.getItem('pmoc_equipments') || '[]');
+                 const localEq = localEquipments.find((e: Equipment) => e.id === equipmentId);
+                 
+                 if (localEq) {
+                     // We also need the customer name for the view, so let's try to find it
+                     const localCustomers = JSON.parse(localStorage.getItem('pmoc_customers') || '[]');
+                     const customer = localCustomers.find((c: any) => c.id === localEq.customer_id);
+                     
+                     // Or fetch from DB if customer is real
+                     let dbCustomer = null;
+                     if (!customer) {
+                         const { data: cData } = await supabase.from('customers').select('*').eq('id', localEq.customer_id).single();
+                         dbCustomer = cData;
+                     }
+
+                     equipmentData = {
+                         ...localEq,
+                         customers: customer || dbCustomer || { name: 'Cliente (Simulação)' }
+                     };
+                 }
             }
 
-            const { data: historyData, error: historyError } = await supabase
-                .from('service_orders')
-                .select('*')
-                .eq('equipment_id', equipmentId)
-                .order('created_at', { ascending: false });
-            
-            if (historyError) {
-                console.error("Error fetching service history", historyError);
+            if (equipmentData) {
+                setEquipment(equipmentData);
+                
+                // Fetch History
+                const { data: historyData } = await supabase
+                    .from('service_orders')
+                    .select('*')
+                    .eq('equipment_id', equipmentId)
+                    .order('created_at', { ascending: false });
+                
+                const localOrders = JSON.parse(localStorage.getItem('pmoc_service_orders') || '[]');
+                const localHistory = localOrders.filter((o: ServiceOrder) => o.equipment_id === equipmentId);
+
+                setServiceHistory([...(historyData || []), ...localHistory] as ServiceOrder[]);
             } else {
-                setServiceHistory(historyData as ServiceOrder[]);
+                console.error("Error fetching equipment", eqError);
             }
 
             setLoading(false);

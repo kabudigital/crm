@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ChevronLeft, Mail, Phone, MapPin, Plus, LoaderCircle, Wrench } from 'lucide-react';
@@ -41,29 +42,51 @@ const CustomerDetailPage: React.FC = () => {
 
             const customerId = parseInt(id, 10);
             
-            const { data: customerData, error: customerError } = await supabase
+            // 1. Fetch Customer
+            let customerData: Customer | null = null;
+            const { data: dbCustomer, error: customerError } = await supabase
                 .from('customers')
                 .select('*')
                 .eq('id', customerId)
                 .single();
+            
+            if (dbCustomer) {
+                customerData = dbCustomer;
+            } else {
+                 // Try Local Storage for Customer
+                 const localCustomers = JSON.parse(localStorage.getItem('pmoc_customers') || '[]');
+                 customerData = localCustomers.find((c: Customer) => c.id === customerId) || null;
+            }
 
+            // 2. Fetch Orders
             const { data: ordersData, error: ordersError } = await supabase
                 .from('service_orders')
                 .select('*')
                 .eq('customer_id', customerId)
                 .order('created_at', { ascending: false });
+            
+            // Merge Local Orders
+            const localOrders = JSON.parse(localStorage.getItem('pmoc_service_orders') || '[]');
+            const customerLocalOrders = localOrders.filter((o: ServiceOrder) => o.customer_id === customerId);
+            const allOrders = [...(ordersData || []), ...customerLocalOrders];
 
+            // 3. Fetch Equipments
             const { data: equipmentsData, error: equipmentsError } = await supabase
                 .from('equipments')
                 .select('*')
                 .eq('customer_id', customerId);
             
-            if (customerError || ordersError || equipmentsError) {
-                console.error('Error fetching customer data:', customerError, ordersError, equipmentsError);
+            // Merge Local Equipments
+            const localEquipments = JSON.parse(localStorage.getItem('pmoc_equipments') || '[]');
+            const customerLocalEquipments = localEquipments.filter((e: Equipment) => e.customer_id === customerId);
+            const allEquipments = [...(equipmentsData || []), ...customerLocalEquipments];
+            
+            if (customerError && !customerData) {
+                console.error('Error fetching customer data:', customerError);
             } else {
                 setCustomer(customerData);
-                setServiceOrders(ordersData as ServiceOrder[]);
-                setEquipments(equipmentsData);
+                setServiceOrders(allOrders as ServiceOrder[]);
+                setEquipments(allEquipments as Equipment[]);
             }
 
             setLoading(false);
@@ -130,15 +153,16 @@ const CustomerDetailPage: React.FC = () => {
             <div className="bg-white p-6 rounded-xl shadow-md">
                  <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-bold text-brand-dark flex items-center"><Wrench size={20} className="mr-2"/> Equipamentos</h2>
-                     <button className="flex items-center gap-2 px-4 py-2 border rounded-lg text-sm hover:bg-gray-100">
+                     <Link to={`/customers/${id}/equipments/new`} className="flex items-center gap-2 px-4 py-2 border rounded-lg text-sm hover:bg-gray-100">
                         <Plus size={16}/>Adicionar Equipamento
-                    </button>
+                    </Link>
                 </div>
                  <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                             <tr>
                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome / Descrição</th>
+                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo / Local</th>
                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Marca / Modelo</th>
                                 <th scope="col" className="relative px-6 py-3"><span className="sr-only">Ver</span></th>
                             </tr>
@@ -147,6 +171,7 @@ const CustomerDetailPage: React.FC = () => {
                              {equipments.map(eq => (
                                 <tr key={eq.id}>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{eq.name}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{eq.type} - {eq.location}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{eq.brand} / {eq.model}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                         <Link to={`/equipment/${eq.id}`} className="text-brand-primary hover:underline">Ver Histórico</Link>
@@ -155,7 +180,7 @@ const CustomerDetailPage: React.FC = () => {
                             ))}
                             {equipments.length === 0 && (
                                 <tr>
-                                    <td colSpan={3} className="text-center py-4 text-gray-500">Nenhum equipamento cadastrado.</td>
+                                    <td colSpan={4} className="text-center py-4 text-gray-500">Nenhum equipamento cadastrado.</td>
                                 </tr>
                             )}
                          </tbody>

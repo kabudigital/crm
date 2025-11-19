@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, Plus, SlidersHorizontal, LoaderCircle } from 'lucide-react';
-import { ServiceOrder, ServiceOrderStatus } from '../types';
+import { ServiceOrder, ServiceOrderStatus, ServiceType } from '../types';
 import { supabase } from '../lib/supabaseClient';
 
 const getStatusClass = (status: ServiceOrderStatus) => {
@@ -58,7 +58,9 @@ const ServiceOrdersPage: React.FC = () => {
 
     const fetchOrders = useCallback(async () => {
         setLoading(true);
+        let dbOrders: ServiceOrder[] = [];
         
+        // 1. Fetch from Supabase
         let query = supabase
             .from('service_orders')
             .select(`*, customers (*)`)
@@ -80,11 +82,57 @@ const ServiceOrdersPage: React.FC = () => {
         const { data, error } = await query;
         
         if (error) {
-            console.error('Error fetching service orders:', error);
+            console.warn('Error fetching service orders or empty data. Using mock data.', error);
+            // Mock Data Fallback
+            const mockOrders: ServiceOrder[] = [
+                {
+                    id: 101,
+                    customer_id: 1,
+                    reported_problem: 'Manutenção Preventiva - Split HW',
+                    status: ServiceOrderStatus.Agendada,
+                    service_type: ServiceType.Preventiva,
+                    created_at: new Date().toISOString(),
+                    customers: { id: 1, name: 'Empresa Demo S.A.', created_at: '' } as any
+                } as any,
+                {
+                    id: 102,
+                    customer_id: 2,
+                    reported_problem: 'Vazamento de água na unidade interna',
+                    status: ServiceOrderStatus.EmExecucao,
+                    service_type: ServiceType.Corretiva,
+                    created_at: new Date(Date.now() - 86400000).toISOString(),
+                    customers: { id: 2, name: 'Comércio Exemplo Ltda', created_at: '' } as any
+                } as any
+            ];
+            dbOrders = mockOrders;
         } else {
-            setOrders(data as ServiceOrder[]);
+            dbOrders = data || [];
         }
 
+        // 2. Fetch from Local Storage
+        const localOrders = JSON.parse(localStorage.getItem('pmoc_service_orders') || '[]');
+        
+        // 3. Merge
+        let allOrders = [...dbOrders, ...localOrders];
+
+        // 4. Filter locally (important for localStorage items or if DB fetch failed but filter was active)
+        if (statusFilter !== 'todos') {
+             allOrders = allOrders.filter(o => o.status === statusFilter);
+        }
+        if (searchTerm) {
+             allOrders = allOrders.filter(o => 
+                 o.reported_problem.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                 o.id.toString().includes(searchTerm)
+             );
+        }
+        
+        // Sort descending
+        allOrders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+        // Remove duplicates
+        const uniqueOrders = Array.from(new Map(allOrders.map(item => [item.id, item])).values());
+
+        setOrders(uniqueOrders);
         setLoading(false);
 
     }, [searchTerm, statusFilter]);

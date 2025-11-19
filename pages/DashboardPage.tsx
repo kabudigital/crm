@@ -3,7 +3,7 @@ import { FileText, Building, Wrench, Users, Plus, LoaderCircle } from 'lucide-re
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import StatCard from '../components/StatCard';
 import { Link } from 'react-router-dom';
-import { ServiceOrder, ServiceOrderStatus, Customer, User, UserRole } from '../types';
+import { ServiceOrder, ServiceOrderStatus, Customer, User, UserRole, ServiceType } from '../types';
 import { supabase } from '../lib/supabaseClient';
 
 const serviceData = [
@@ -26,6 +26,7 @@ const DashboardPage: React.FC = () => {
         const fetchData = async () => {
             setLoading(true);
             
+            // 1. Fetch DB
             const { data: ordersData, error: ordersError } = await supabase
                 .from('service_orders')
                 .select(`*, customers (*), users (*), equipments (*)`);
@@ -38,14 +39,65 @@ const DashboardPage: React.FC = () => {
                 .from('users')
                 .select('*');
 
+            let dbOrders = ordersData || [];
+            let dbCustomers = customersData || [];
+            let dbUsers = usersData || [];
+
             if (ordersError || customersError || usersError) {
-                console.error('Error fetching data:', ordersError, customersError, usersError);
-            } else {
-                setServiceOrders(ordersData as ServiceOrder[]);
-                setCustomers(customersData);
-                setUsers(usersData);
-                setTechnicians(usersData.filter(u => u.role === UserRole.Technician));
-            }
+                console.warn('Supabase fetch failed or returned empty. Using mock data + local storage.', { ordersError, customersError, usersError });
+                
+                // Mock Data Fallback
+                const mockCustomers: Customer[] = [
+                    { id: 1, name: 'Empresa Demo S.A.', address: 'Av. Paulista, 1000', created_at: new Date().toISOString() },
+                    { id: 2, name: 'Comércio Exemplo Ltda', address: 'Rua Augusta, 500', created_at: new Date().toISOString() }
+                ];
+                const mockUsers: User[] = [
+                    { id: '1', name: 'Carlos Técnico', email: 'carlos@demo.com', role: UserRole.Technician },
+                    { id: '2', name: 'Ana Admin', email: 'ana@demo.com', role: UserRole.Admin }
+                ];
+                const mockOrders: ServiceOrder[] = [
+                    { 
+                        id: 101, 
+                        customer_id: 1, 
+                        reported_problem: 'Manutenção Preventiva - AC Split', 
+                        status: ServiceOrderStatus.Agendada, 
+                        created_at: new Date().toISOString(), 
+                        service_type: ServiceType.Preventiva, 
+                        customers: mockCustomers[0] 
+                    } as any,
+                    { 
+                        id: 102, 
+                        customer_id: 2, 
+                        reported_problem: 'Ar condicionado não gela', 
+                        status: ServiceOrderStatus.EmExecucao, 
+                        created_at: new Date(Date.now() - 86400000).toISOString(), 
+                        service_type: ServiceType.Corretiva, 
+                        customers: mockCustomers[1] 
+                    } as any
+                ];
+
+                dbOrders = mockOrders as any;
+                dbCustomers = mockCustomers;
+                dbUsers = mockUsers;
+            } 
+
+            // 2. Load Local Storage
+            const localOrders = JSON.parse(localStorage.getItem('pmoc_service_orders') || '[]');
+            const localCustomers = JSON.parse(localStorage.getItem('pmoc_customers') || '[]');
+            const localTechnicians = JSON.parse(localStorage.getItem('pmoc_technicians') || '[]');
+
+            // 3. Merge
+            const allOrders = [...dbOrders, ...localOrders];
+            const allCustomers = [...dbCustomers, ...localCustomers];
+            const allUsers = [...dbUsers, ...localTechnicians];
+
+            // Remove duplicates
+            setServiceOrders(Array.from(new Map(allOrders.map(item => [item.id, item])).values()));
+            setCustomers(Array.from(new Map(allCustomers.map(item => [item.id, item])).values()));
+            setUsers(Array.from(new Map(allUsers.map(item => [item.id, item])).values()));
+            
+            const allTechs = allUsers.filter(u => u.role === UserRole.Technician);
+            setTechnicians(allTechs);
             
             setLoading(false);
         };
@@ -60,7 +112,7 @@ const DashboardPage: React.FC = () => {
     const openOrders = serviceOrders.filter(so => so.status !== ServiceOrderStatus.Concluida && so.status !== ServiceOrderStatus.Cancelada).length;
     const upcomingServiceOrders = serviceOrders
       .filter(so => so.status !== ServiceOrderStatus.Concluida && so.status !== ServiceOrderStatus.Cancelada)
-      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) // Older first? or newer? usually upcoming means future dates or oldest created
       .slice(0, 3);
       
     return (
@@ -94,10 +146,11 @@ const DashboardPage: React.FC = () => {
                         {upcomingServiceOrders.map(so => (
                            <li key={so.id} className="p-3 bg-gray-50 rounded-lg">
                                <p className="font-semibold text-brand-dark line-clamp-2">{so.reported_problem}</p>
-                               <p className="text-sm text-gray-500">{so.customers?.name}</p>
+                               <p className="text-sm text-gray-500">{so.customers?.name || 'Cliente Local/Mock'}</p>
                                <p className="text-sm text-gray-500">Aberta em: {new Date(so.created_at).toLocaleDateString()}</p>
                            </li>
                         ))}
+                        {upcomingServiceOrders.length === 0 && <p className="text-gray-500 text-sm">Nenhuma ordem próxima.</p>}
                     </ul>
                 </div>
             </div>

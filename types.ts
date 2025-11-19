@@ -1,3 +1,4 @@
+
 export enum UserRole {
   Admin = 'admin',
   Supervisor = 'supervisor',
@@ -31,6 +32,8 @@ export interface Equipment {
     model?: string;
     serial_number?: string;
     capacity_btu?: number;
+    type?: string;     // New: e.g., Split, VRF
+    location?: string; // New: e.g., Sala de Reunião
     created_at: string;
     customers?: Customer; // For joins
 }

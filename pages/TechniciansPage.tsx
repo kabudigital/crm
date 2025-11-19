@@ -11,6 +11,8 @@ const TechniciansPage: React.FC = () => {
 
     const fetchTechnicians = useCallback(async () => {
         setLoading(true);
+        let dbTechs: User[] = [];
+        
         let query = supabase
             .from('users')
             .select('*')
@@ -23,10 +25,29 @@ const TechniciansPage: React.FC = () => {
         const { data, error } = await query;
         
         if (error) {
-            console.error('Error fetching technicians:', error);
+            console.warn('Error fetching technicians (using mock data):', JSON.stringify(error));
+            // Mock Data
+             const mockTechs: User[] = [
+                { id: '1', name: 'Carlos Técnico (Demo)', email: 'carlos@demo.com', phone: '(11) 91234-5678', role: UserRole.Technician },
+                { id: '2', name: 'João Silva (Demo)', email: 'joao@demo.com', phone: '(11) 98765-4321', role: UserRole.Technician }
+            ];
+             dbTechs = mockTechs;
         } else {
-            setTechnicians(data);
+            dbTechs = data || [];
         }
+
+        // Local Storage (Simulation)
+        const localTechs = JSON.parse(localStorage.getItem('pmoc_technicians') || '[]');
+        let allTechs = [...dbTechs, ...localTechs];
+
+        if (searchTerm) {
+            allTechs = allTechs.filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase()));
+        }
+
+         // Remove duplicates
+        const uniqueTechs = Array.from(new Map(allTechs.map(item => [item.id, item])).values());
+
+        setTechnicians(uniqueTechs);
         setLoading(false);
     }, [searchTerm]);
 

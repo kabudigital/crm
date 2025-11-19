@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, FileText, Wrench, ChevronLeft, ChevronRight, Building, LogOut, Megaphone, ClipboardList, FileSignature } from 'lucide-react';
+import { LayoutDashboard, FileText, Wrench, ChevronLeft, ChevronRight, Building, LogOut, Megaphone, ClipboardList, FileSignature, ClipboardCheck } from 'lucide-react';
 import { User } from '../types';
 
 interface SidebarProps {
@@ -16,8 +16,9 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
     { to: '/service-orders', icon: FileText, label: 'Ordens de Serviço' },
     { to: '/customers', icon: Building, label: 'Clientes' },
     { to: '/technicians', icon: Wrench, label: 'Técnicos' },
-    { to: '/quotes', icon: ClipboardList, label: 'Orçamentos' },
+    { to: '/pmoc', icon: ClipboardCheck, label: 'PMOC / Laudos' },
     { to: '/contracts', icon: FileSignature, label: 'Contratos' },
+    { to: '/quotes', icon: ClipboardList, label: 'Orçamentos' },
     { to: '/campaigns', icon: Megaphone, label: 'Campanhas' },
   ];
 

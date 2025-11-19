@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ChevronLeft, LoaderCircle, FileSignature, Building, Calendar, RefreshCw, Wrench, CheckCircle, XCircle, FileClock } from 'lucide-react';
+import { ChevronLeft, LoaderCircle, FileText, Building, Calendar, RefreshCw, Wrench, CheckCircle, XCircle, FileClock } from 'lucide-react';
 import { Contract, ServiceOrder, ContractStatus, ServiceOrderStatus, ServiceType, Equipment } from '../types';
 import { supabase } from '../lib/supabaseClient';
 import { QRCodeSVG } from 'qrcode.react';
@@ -26,39 +27,83 @@ const ContractDetailPage: React.FC = () => {
             setLoading(true);
 
             const contractId = parseInt(id, 10);
-            
-            // Fetch contract details
-            const { data: contractData, error: contractError } = await supabase
+            let contractData: Contract | null = null;
+
+            // 1. Try Supabase
+            const { data: dbContract, error: contractError } = await supabase
                 .from('contracts')
                 .select('*, customers (*)')
                 .eq('id', contractId)
                 .single();
 
-            if (contractError) {
-                console.error("Error fetching contract", contractError);
-                setLoading(false);
-                return;
-            }
-            setContract(contractData as unknown as Contract);
-
-            // Fetch associated equipments
-            const { data: contractEquipments, error: ceError } = await supabase
-                .from('contract_equipments')
-                .select('equipment_id')
-                .eq('contract_id', contractId);
-            
-            if (ceError) {
-                console.error("Error fetching contract equipments", ceError);
+            if (dbContract) {
+                contractData = dbContract as unknown as Contract;
             } else {
-                const equipmentIds = contractEquipments.map(ce => ce.equipment_id);
-                if (equipmentIds.length > 0) {
-                    const { data: equipmentData, error: eqError } = await supabase
-                        .from('equipments')
-                        .select('*')
-                        .in('id', equipmentIds);
-                    if (eqError) console.error("Error fetching equipments", eqError);
-                    else setEquipments(equipmentData);
+                // 2. Try Local Storage
+                const localContracts = JSON.parse(localStorage.getItem('pmoc_contracts') || '[]');
+                const localMatch = localContracts.find((c: Contract) => c.id === contractId);
+                
+                if (localMatch) {
+                    contractData = localMatch;
+                } else {
+                    // 3. Try Mock Data (The ones displayed in ContractsPage)
+                    const mockContracts: Contract[] = [
+                        {
+                            id: 1,
+                            name: 'Manutenção Preventiva Mensal - Sede',
+                            customer_id: 1,
+                            status: ContractStatus.Ativo,
+                            start_date: '2024-01-01',
+                            end_date: '2024-12-31',
+                            frequency: 'mensal',
+                            created_at: new Date().toISOString(),
+                            customers: { name: 'Empresa Demo S.A.' } as any
+                        },
+                        {
+                            id: 2,
+                            name: 'PMOC Trimestral - Filial',
+                            customer_id: 2,
+                            status: ContractStatus.Inativo,
+                            start_date: '2023-01-01',
+                            end_date: '2023-12-31',
+                            frequency: 'trimestral',
+                            created_at: new Date().toISOString(),
+                            customers: { name: 'Comércio Exemplo Ltda' } as any
+                        }
+                    ];
+                    contractData = mockContracts.find(c => c.id === contractId) || null;
                 }
+            }
+            
+            if (!contractData) {
+                 console.error("Contract not found", contractError);
+                 setLoading(false);
+                 return;
+            }
+
+            setContract(contractData);
+
+            // Fetch ALL equipments for this customer (Supabase + Local)
+            if (contractData) {
+                const { data: dbEquipments } = await supabase
+                    .from('equipments')
+                    .select('*')
+                    .eq('customer_id', contractData.customer_id);
+                
+                const localEquipments = JSON.parse(localStorage.getItem('pmoc_equipments') || '[]');
+                const customerLocalEquipments = localEquipments.filter((e: Equipment) => e.customer_id === contractData!.customer_id);
+                
+                let allEquipments = [...(dbEquipments || []), ...customerLocalEquipments];
+                
+                // Add mock equipments if empty for demo contracts
+                if (allEquipments.length === 0 && (contractId === 1 || contractId === 2)) {
+                     allEquipments = [
+                         { id: 101, customer_id: 1, name: 'Ar Condicionado Server Room', type: 'Split Hi-Wall', brand: 'Daikin', model: 'FTX12', location: 'Sala Servidor', created_at: '', capacity_btu: 12000, serial_number: 'SN123' } as any,
+                         { id: 102, customer_id: 1, name: 'Chiller Central', type: 'Chiller', brand: 'Hitachi', model: 'RCU', location: 'Cobertura', created_at: '', capacity_btu: 600000, serial_number: 'CH999' } as any
+                     ];
+                }
+
+                setEquipments(allEquipments);
             }
 
             // Fetch associated service orders
@@ -67,11 +112,10 @@ const ContractDetailPage: React.FC = () => {
                 .select('*, equipments (*), users (*)')
                 .eq('contract_id', contractId);
             
-            if (ordersError) {
-                console.error("Error fetching service orders", ordersError);
-            } else {
-                setServiceOrders(ordersData as ServiceOrder[]);
-            }
+            const localOrders = JSON.parse(localStorage.getItem('pmoc_service_orders') || '[]');
+            const contractLocalOrders = localOrders.filter((so: ServiceOrder) => so.contract_id === contractId);
+
+            setServiceOrders([...(ordersData || []), ...contractLocalOrders] as ServiceOrder[]);
             
             setLoading(false);
         };
@@ -115,6 +159,12 @@ const ContractDetailPage: React.FC = () => {
                         <h1 className="text-3xl font-bold text-brand-dark mt-2">{contract.name}</h1>
                         <p className="text-lg text-gray-600">{contract.customers?.name}</p>
                     </div>
+                    <div className="mt-4 md:mt-0">
+                        <Link to={`/contracts/${id}/pmoc`} className="flex items-center gap-2 px-4 py-2 bg-brand-secondary text-white rounded-lg hover:bg-brand-secondary/90 font-medium">
+                            <FileText size={20} />
+                            Gerar Plano PMOC (PDF)
+                        </Link>
+                    </div>
                 </div>
                  <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 border-t pt-6 text-sm">
                     <div className="flex items-start"><Building size={18} className="text-gray-500 mr-3 mt-1 flex-shrink-0"/><div><p className="text-gray-500">Cliente</p><p className="font-semibold">{contract.customers?.name}</p></div></div>
@@ -124,7 +174,7 @@ const ContractDetailPage: React.FC = () => {
             </div>
 
             <div className="bg-white p-6 rounded-xl shadow-md">
-                <h2 className="text-xl font-bold text-brand-dark mb-4 flex items-center"><Wrench size={20} className="mr-2"/> Equipamentos Cobertos</h2>
+                <h2 className="text-xl font-bold text-brand-dark mb-4 flex items-center"><Wrench size={20} className="mr-2"/> Equipamentos Cobertos (Inventário)</h2>
                  <ul className="space-y-3">
                    {equipments.map(eq => {
                        const equipmentHistoryUrl = `${window.location.origin}/equipment/${eq.id}/pmoc-history`;
@@ -132,14 +182,15 @@ const ContractDetailPage: React.FC = () => {
                          <li key={eq.id} className="p-3 bg-gray-50 rounded-md flex justify-between items-center">
                            <div>
                                <p className="font-semibold text-gray-800">{eq.name}</p>
-                               <p className="text-xs text-gray-500">{eq.brand} {eq.model} (S/N: {eq.serial_number})</p>
+                               <p className="text-xs text-gray-500">{eq.type || 'Equip.'} &bull; {eq.brand} {eq.model} &bull; {eq.location || 'Sem local'}</p>
                            </div>
                            <Link to={`/equipment/${eq.id}/pmoc-history`} title="Ver Histórico de Manutenção PMOC">
-                               <QRCodeSVG value={equipmentHistoryUrl} size={64} />
+                               <QRCodeSVG value={equipmentHistoryUrl} size={48} />
                            </Link>
                          </li>
                        )
                    })}
+                   {equipments.length === 0 && <p className="text-gray-500 text-sm">Nenhum equipamento cadastrado para este cliente.</p>}
                  </ul>
             </div>
             
